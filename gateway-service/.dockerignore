@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual envs
+.venv/
+env/
+venv/
+
+# Dependency caches
+pip-wheel-metadata/
+*.egg-info/
+
+# Local env files
+.env
+.env.*
+!env.sample  # keep sample env for reference
+
+# Git
+.git
+.gitignore
+
+# Docker files
+Dockerfile
+docker-compose.yaml
+
+# IDE / Editor stuff
+.vscode/
+.idea/
+*.swp
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Other
+__pycache__/

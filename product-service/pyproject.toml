@@ -1,0 +1,17 @@
+[project]
+name = "product-service"
+version = "0.1.0"
+description = "Product service for an e-commerce application, managing products, variations, images, categories, and comments"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.118.0",
+    "sqlalchemy>=2.0.35",
+    "psycopg2-binary>=2.9.9",
+    "uvicorn>=0.30.6",
+    "pydantic>=2.9.2",
+    "python-dotenv>=1.0.1",
+    "alembic>=1.13.1",
+    "websockets>=10.0,<12.0",
+    "httpx>=0.28.1",
+]

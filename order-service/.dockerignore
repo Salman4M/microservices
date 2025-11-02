@@ -1,0 +1,30 @@
+# Git
+.git 
+.gitignore
+
+# Docker
+docker-compose.yml
+Dockerfile
+.docker
+.dockerignore
+
+# Python
+app/__pycache__
+app/*/__pycache__
+app/*/*/__pycache__
+app/*/*/*/__pycache__
+
+
+# Django stuff:
+*.log
+
+
+# Virtual environment
+.env
+.venv/
+venv/
+env/
+.env/
+
+# VS Code
+.vscode/

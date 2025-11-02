@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  gateway_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gateway_service
+    command: ["sh", "/app/entrypoint.sh"]
+    ports:
+      - "8002:8080"
+    env_file:
+      - .env
+    working_dir: /app
+    volumes:
+      - ./gateway:/app/gateway:rw
+      - ./uv.lock:/app/uv.lock:rw
+      - ./pyproject.toml:/app/pyproject.toml:rw
+      - ./.cache/uv:/home/appuser/.cache/uv  
+    restart: unless-stopped
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    external: true

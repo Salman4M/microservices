@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  product-service-web-1:
+    build: .
+    container_name: fastapi_app
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
+    command: >
+      sh -c ". .venv/bin/activate && alembic upgrade head && uvicorn src.app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8006:8000"
+    networks:
+      - internal_net
+      - shared_network
+
+  db:
+    image: postgres:15
+    container_name: product_postgres_db
+    restart: always
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    networks:
+      - internal_net
+
+networks:
+  internal_net:
+  # internal: true
+    driver: bridge
+  shared_network:
+    external: true
+    name: shared_network
+volumes:
+  postgres_data:

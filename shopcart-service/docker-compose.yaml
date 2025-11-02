@@ -1,0 +1,108 @@
+
+services:
+  shopcart_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopcart_service
+    command: ["sh", "/app/entrypoint.sh"]
+    ports:
+      - "8008:8000"
+    env_file:
+      - .env
+    environment:
+      SKIP_MIGRATIONS: "false" 
+      # ENV: development (for deployment on google cloud)
+      DATABASE_URL: postgresql+psycopg://postgres:4444@db:5432/shopcart_db
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: "4444"
+      DB_NAME: shopcart_db
+      DB_PORT: 5432
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+      PRODUCT_SERVICE: http://fastapi_app:8000
+
+    depends_on:
+      - db
+    working_dir: /app
+    volumes:
+    #mount local files so Uvicorn sees changes instantly
+      - ./src:/app/src:rw
+      - ./uv.lock:/app/uv.lock:rw
+      - ./pyproject.toml:/app/pyproject.toml:rw
+      - ./.cache/uv:/home/appuser/.cache/uv  # fixing permission denied errors
+    restart: unless-stopped
+    networks:
+      - internal_net
+      - shared_network
+
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal_net
+
+  shopcart_consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shopcart_consumer
+    entrypoint: []
+    command: ["python", "/app/consumer.py"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:4444@db:5432/shopcart_db
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: "4444"
+      DB_NAME: shopcart_db
+      DB_PORT: 5432
+      SECRET_KEY: d4a18b05f4a744a6a2d9981c57cb07a635fe01912c994e5f68b4db7b6b6a7f2d
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+    depends_on:
+      db:
+        condition: service_healthy
+      shopcart_service:  # Wait for service to run migrations first
+        condition: service_started
+    working_dir: /app
+    volumes:
+      - ./src:/app/src:rw
+      - ./consumer.py:/app/consumer.py:rw
+    networks:
+      - internal_net
+      - shared_network
+    restart: unless-stopped
+
+networks: 
+  internal_net:
+    driver: bridge
+  shared_network:
+    external: true
+    name: shared_network
+
+
+volumes:
+  postgres_data:
