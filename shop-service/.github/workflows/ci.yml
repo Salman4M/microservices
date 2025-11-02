@@ -1,0 +1,74 @@
+name: Django CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      SECRET_KEY: test-ci-key
+      DEBUG: '0'
+      ALLOWED_HOSTS: '*'
+      POSTGRES_DB: shop_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '5432'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shop_service
+        ports:
+          - 5438:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shop_service"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv (fast Python package manager)
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Install dependencies from pyproject/uv.lock
+        run: |
+          uv sync --frozen
+
+      - name: Wait for Postgres to be ready
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          for i in {1..30}; do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d shop_service; then
+              echo "Postgres is ready"; break; fi; echo "Waiting for Postgres..."; sleep 2;
+          done
+
+      - name: Run migrations
+        run: |
+          cd shop_service
+          uv run python manage.py migrate --noinput
+
+      - name: Run tests
+        run: |
+          cd shop_service
+          uv run pytest -q

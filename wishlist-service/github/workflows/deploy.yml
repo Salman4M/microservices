@@ -1,0 +1,56 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repo
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Google Cloud SDK
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+
+      # Step 3: Authenticate Docker with GCP
+      - name: Configure Docker for GCP
+        run: gcloud auth configure-docker
+
+      # Step 4: Build Docker image
+      - name: Build Docker image
+        run: |
+          IMAGE="europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/shopcart-micro/shopcart-service:${GITHUB_SHA}"
+          docker build -t $IMAGE .
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      # Step 5: Push Docker image to Artifact Registry
+      - name: Push Docker image
+        run: docker push $IMAGE
+
+      # Step 6: Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy wishlist-service-ecommerce \
+            --source . \
+            --region=europe-west1 \
+            --add-cloudsql-instances=smart-acrobat-474814-a2:europe-west1:wishlist-service \
+            --set-env-vars="DATABASE_URL=postgresql+asyncpg://postgres:MySecurePass2024!@/wishlist_db?host=/cloudsql/smart-acrobat-474814-a2:europe-west1:wishlist-service,SECRET_KEY=5e2a977317aea53f39a6f5b95b85ab36" \
+            --allow-unauthenticated \
+            --max-instances=3 \
+            --timeout=300 \
+            --project=smart-acrobat-474814-a2
+
+            
+DATABASE_URL=${{ secrets.DATABASE_URL }},\
+SECRET_KEY=${{ secrets.SECRET_KEY }},\
+ALGORITHM=HS256,\
+ACCESS_TOKEN_EXPIRE_MINUTES=30,\
+CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}

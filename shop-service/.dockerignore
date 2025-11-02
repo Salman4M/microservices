@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+
+# Env
+.env
+.env.*
+.venv/
+venv/
+
+# Django
+staticfiles/
+media/
+
+# VCS / IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Build
+build/
+dist/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+
+# uv/poetry caches
+.uv/
+.poetry/
+
+
