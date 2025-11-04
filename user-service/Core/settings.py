@@ -179,3 +179,23 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
 }
 
+
+# Logging settings
+LOGGING_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGGING_DIR, exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'formatters': {
+        'default': {'format': '{levelname} {asctime} {name} {message}', 'style': '{'},
+    },
+    'handlers': {
+        'file': {'class': 'logging.FileHandler', 'filename': os.path.join(LOGGING_DIR, 'drf_api.log'), 'formatter': 'default'},
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'default'},
+    },
+    'loggers': {
+        'django': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
+        'shop_service': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': False},
+        'user_events': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': False},
+    },
+}

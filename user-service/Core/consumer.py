@@ -5,6 +5,7 @@ import os
 import django
 import sys
 from pathlib import Path
+import logging
 
 # Setup Django
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -14,6 +15,8 @@ django.setup()
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+logger = logging.getLogger("user_events")
+
 
 
 class ShopEventConsumer:
@@ -34,45 +37,41 @@ class ShopEventConsumer:
         )
         return pika.BlockingConnection(parameters)
     
-    def handle_shop_created(self, message: dict):
-        """Handle shop.created event"""
+    def handle_shop_approved(self, message: dict):
         try:
             user_uuid = message.get('user_uuid')
             shop_id = message.get('shop_id')
             
             if not user_uuid:
-                print(f"⚠️ Missing user_uuid in shop.created event")
+                logger.warning("Missing user_uuid in shop.approved event")
                 return False
             
-            # Update user to be shop owner
             user = User.objects.get(id=user_uuid)
             user.is_shop_owner = True
             user.save()
             
-            print(f"✅ User {user_uuid} is now a shop owner (shop: {shop_id})")
+            logger.info(f"User {user_uuid} is now shop owner (shop={shop_id})")
             return True
             
         except User.DoesNotExist:
-            print(f"❌ User {user_uuid} not found")
+            logger.error(f"User {user_uuid} not found")
             return False
         except Exception as e:
-            print(f"❌ Failed to handle shop.created event: {e}")
+            logger.error(f"Failed to handle shop.approved event: {e}")
             return False
     
     def callback(self, ch, method, properties, body):
-        """Handle incoming messages"""
         try:
             message = json.loads(body)
             event_type = message.get('event_type')
             
-            print(f"📨 Received event: {event_type}")
+            logger.info(f"Received event: {event_type}")
             
-            success = False
-            if event_type == 'shop.created':
-                success = self.handle_shop_created(message)
+            if event_type == 'shop.approved':
+                success = self.handle_shop_approved(message)
             else:
-                print(f"⚠️ Unknown event type: {event_type}")
-                success = True  # Ack unknown events
+                logger.warning(f"Unknown event type: {event_type}")
+                success = True
             
             if success:
                 ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -80,14 +79,13 @@ class ShopEventConsumer:
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
                 
         except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON: {e}")
+            logger.error(f"Invalid JSON: {e}")
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         except Exception as e:
-            print(f"❌ Error processing message: {e}")
+            logger.error(f"Error processing message: {e}")
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     
     def start_consuming(self):
-        """Start listening for shop events"""
         import time
         
         while True:
@@ -95,22 +93,19 @@ class ShopEventConsumer:
                 connection = self.get_connection()
                 channel = connection.channel()
                 
-                # Declare exchange
                 channel.exchange_declare(
                     exchange='shop_events',
                     exchange_type='topic',
                     durable=True
                 )
                 
-                # Declare queue
                 queue_name = 'user_shop_events'
                 channel.queue_declare(queue=queue_name, durable=True)
                 
-                # Bind queue to shop events
                 channel.queue_bind(
                     exchange='shop_events',
                     queue=queue_name,
-                    routing_key='shop.created'
+                    routing_key='shop.approved'
                 )
                 
                 channel.basic_qos(prefetch_count=1)
@@ -119,15 +114,14 @@ class ShopEventConsumer:
                     on_message_callback=self.callback
                 )
                 
-                print('🎧 User service listening for shop.created events...')
+                logger.info("User service listening for shop.approved events…")
                 channel.start_consuming()
                 
             except KeyboardInterrupt:
-                print("🛑 Stopping consumer...")
+                logger.info("Stopping consumer…")
                 break
             except Exception as e:
-                print(f"❌ Connection error: {e}")
-                print("⏳ Retrying in 5 seconds...")
+                logger.error(f"Connection error: {e}")
                 time.sleep(5)
 
 

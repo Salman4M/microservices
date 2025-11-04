@@ -17,10 +17,19 @@ __all__ = [
 ]
 
 class Shop(SluggedModel):
+    APPROVED = 'APPROVED'
+    PENDING = 'PENDING'
+    REJECTED = 'REJECTED'
+    STATUS_LIST = [
+        (APPROVED, APPROVED ),
+        (PENDING, PENDING),
+        (REJECTED, REJECTED)
+    ]
+
     user = models.UUIDField(
         null=False,
         verbose_name='User'
-    )
+    ) 
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -29,7 +38,14 @@ class Shop(SluggedModel):
     name = models.CharField(
         max_length=100,
         validators=[not_only_whitespace],
-        verbose_name='Shop name'
+        verbose_name='Shop name',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_LIST,
+        default=PENDING,
+        verbose_name='Shop status',
+
     )
     about = models.TextField(
         max_length=1000,

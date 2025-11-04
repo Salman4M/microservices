@@ -55,7 +55,7 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
     # Apps
-    'shops'
+    'shops.apps.ShopsConfig'
 ]
 
 MIDDLEWARE = [
@@ -68,7 +68,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'shop_service.middleware.DRFLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'shop_service.urls'
@@ -182,8 +181,20 @@ SPECTACULAR_SETTINGS = {
     'TITLE': 'Shop Service API',
     'DESCRIPTION': """
         Shop Service documentation
+        
+        This API provides endpoints for managing shops, branches, comments, media, and social media.
     """,
     'VERSION': '0.1',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'TAGS': [
+        {'name': 'Shop', 'description': 'Shop management endpoints'},
+        {'name': 'ShopBranch', 'description': 'Shop branch management endpoints'},
+        {'name': 'ShopComment', 'description': 'Shop comment endpoints'},
+        {'name': 'ShopMedia', 'description': 'Shop media management endpoints'},
+        {'name': 'ShopSocialMedia', 'description': 'Shop social media management endpoints'},
+    ],
 }
 
 # Logging settings

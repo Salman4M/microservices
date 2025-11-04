@@ -3,7 +3,6 @@ from typing import Optional
 from uuid import UUID
 
 class CommentBase(BaseModel):
-    user_id: UUID = Field(..., description="ID of the user, managed by User service")
     product_variation_id: UUID = Field(..., description="ID of the associated product variation")
     rating: int = Field(..., ge=1, le=5)
     content: str = Field(..., max_length=1000)
@@ -11,7 +10,10 @@ class CommentBase(BaseModel):
 class CommentCreate(CommentBase):
     pass
 
-class Comment(CommentBase):
+class CommentBaseWithUser(CommentBase):
+    user_id: UUID = Field(..., description="ID of the user, managed by User service")
+
+class Comment(CommentBaseWithUser):
     comment_id: UUID
     created_at: str
     is_active: bool = True

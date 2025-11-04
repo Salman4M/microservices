@@ -3,7 +3,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from collections import defaultdict
 from .models import Order, OrderItem
-from .messaging import publisher
+from order_service.messaging import publisher
 
 logger = logging.getLogger('order_service')
 

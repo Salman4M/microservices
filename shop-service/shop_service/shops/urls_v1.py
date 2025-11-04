@@ -72,7 +72,7 @@ urlpatterns = [
         name='branch-manage'
     ),
     # ShopSocialMedia endpoints
-      path(
+    path(
         'social-media/<slug:shop_slug>/',
         ShopSocialMediaListByShopAPIView.as_view(),
         name='social-media-list'
@@ -93,7 +93,7 @@ urlpatterns = [
         name='social-media-manage'
     ),
     # ShopMedia endpoints
-     path(
+    path(
         'media/<slug:shop_slug>/',
         ShopMediaByShopAPIView.as_view(),
         name='shop-media-list'
