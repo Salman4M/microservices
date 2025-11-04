@@ -1,4 +1,6 @@
+import requests
 from django.db import models
+from django.conf import settings
 
 class Order(models.Model):
     id = models.BigAutoField(primary_key=True)  # BIGSERIAL (PK)
@@ -13,6 +15,24 @@ class Order(models.Model):
         if items.exists() and all(item.status in [3, 4] for item in items):
             self.is_approved = True
             self.save()
+            analytic_url = settings.SERVICE_URLS.get('analytic')
+            order_items = self.items.filter(status=3).values(
+                'id', 'order_id', 'quantity', 'product_variation', 'price'
+            )
+            try:
+                response = requests.post(
+                    analytic_url+'/api/orders/',
+                    json={
+                            'order': self.id,
+                            'user_id': self.user_id,
+                            'created_at': self.created_at,
+                            'items': list(order_items), 
+                        },
+                    timeout=3
+                )
+                print("Sent to analytics:", response.status_code)
+            except requests.exceptions.RequestException as e:
+                print("Analytics request failed:", e)
 
     class Meta:
         db_table = "orders"
@@ -42,6 +62,8 @@ class OrderItem(models.Model):
     status = models.IntegerField(choices=Status.choices, default=Status.PROCESSING)
     quantity = models.IntegerField(default=1)            # INT NOT NULL DEFAULT 1
     product_variation = models.CharField(max_length=36)   # UUID field
+    product_id = models.CharField(max_length=36, null=True, blank=True)  # UUID field (product service-dən)
+    shop_id = models.CharField(max_length=36, null=True, blank=True)      # UUID field (product service-dən)
     price = models.BigIntegerField()                     # BIGINT NOT NULL (kuru x100 saxla: qepik)
 
     class Meta:

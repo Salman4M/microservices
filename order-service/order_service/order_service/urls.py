@@ -9,14 +9,14 @@ from rest_framework.renderers import JSONRenderer
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include('orders.urls_v1')),
+    path('api/', include('orders.urls_v1')),
 ]
 
 urlpatterns += (
      # Swagger & Redoc documentation
     path('openapi.json', SpectacularAPIView.as_view(api_version='1.0', renderer_classes=[JSONRenderer]), name='schema'),
-    path('api/v1/schema/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/v1/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('api/schema/swagger/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 )
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
