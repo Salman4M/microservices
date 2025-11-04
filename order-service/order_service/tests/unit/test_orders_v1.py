@@ -10,7 +10,7 @@ def api_client():
     return APIClient()
 
 
-@pytest.fixture
+@pytest.fixturex
 def sample_order(db):
     return Order.objects.create(user_id=10)
 

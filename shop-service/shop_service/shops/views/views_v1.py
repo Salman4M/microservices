@@ -1,5 +1,7 @@
 import httpx
 import os
+import logging
+from typing import List
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404
@@ -7,12 +9,16 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 from ..models import * 
 from ..serializers import *
 from utils.pagination import CustomPagination
 from shop_service.authentication import GatewayHeaderAuthentication
 from shop_service.messaging import publisher
+
+logger = logging.getLogger('shop_service')
 
 
 __all__ = [
@@ -44,9 +50,16 @@ class ShopListAPIView(APIView):
     http_method_names =['get']
     pagination_class = CustomPagination
 
+    @extend_schema(
+        operation_id='shop_list',
+        summary='List all active shops',
+        description='Get a paginated list of all active shops',
+        tags=['Shop'],
+        responses={200: ShopListSerializer(many=True)}
+    )
     def get(self, request):
         pagination = self.pagination_class()
-        shops = Shop.objects.filter(is_active=True)
+        shops = Shop.objects.filter(is_active=True, status=Shop.APPROVED)
         paginated_shops = pagination.paginate_queryset(shops, request)
         if paginated_shops:
             serializer = ShopListSerializer(paginated_shops, many=True)
@@ -59,8 +72,18 @@ class ShopDetailWithSlugAPIView(APIView):
     """Retrieve details of a specific shop by slug."""
     http_method_names =['get']
 
+    @extend_schema(
+        operation_id='shop_detail_by_slug',
+        summary='Get shop by slug',
+        description='Retrieve detailed information about a shop using its slug',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={200: ShopDetailSerializer, 404: None}
+    )
     def get(self, request, shop_slug):
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         serializer = ShopDetailSerializer(shop)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -69,8 +92,18 @@ class ShopDetailWithUuidAPIView(APIView):
     """Retrieve details of a specific shop by uuid."""
     http_method_names =['get']
 
+    @extend_schema(
+        operation_id='shop_detail_by_uuid',
+        summary='Get shop by UUID',
+        description='Retrieve detailed information about a shop using its UUID',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(name='shop_uuid', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='Shop UUID')
+        ],
+        responses={200: ShopDetailSerializer, 404: None}
+    )
     def get(self, request, shop_uuid):
-        shop = get_object_or_404(Shop, id=shop_uuid, is_active=True)
+        shop = get_object_or_404(Shop, id=shop_uuid, is_active=True, status=Shop.APPROVED)
         serializer = ShopDetailSerializer(shop)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -81,23 +114,31 @@ class ShopCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='shop_create',
+        summary='Create a new shop',
+        description='Create a new shop. Only authenticated users can create shops.',
+        tags=['Shop'],
+        request=ShopCreateUpdateSerializer,
+        responses={201: ShopCreateUpdateSerializer, 400: None}
+    )
     def post(self, request):
         user = request.user
+        logger.info(f"POST /create/ - Shop creation request from user {user.id}")
+        if Shop.objects.filter(user=user.id).first():
+            logger.warning(f"POST /create/ - User {user.id} already has a shop")
+            return Response({'error': 'You already have Shop'}, status=status.HTTP_400_BAD_REQUEST)
+
         data = request.data.copy()  
         data['user'] = str(user.id)  
         serializer = ShopCreateUpdateSerializer(data=data)
         if serializer.is_valid():
-            shop = serializer.save()
-            try:
-                publisher.publish_shop_created(
-                    user_uuid=str(user.id),
-                    shop_id=str(shop.id)
-                )
-            except Exception as e:
-                print(f"⚠️ Failed to publish shop.created event: {e}")
+            shop = serializer.save(user=user.id)  
+            logger.info(f"POST /create/ - Shop {shop.id} created successfully by user {user.id} with status {shop.status}")
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
+        logger.warning(f"POST /create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -107,30 +148,58 @@ class ShopManagementAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='shop_update',
+        summary='Update a shop',
+        description='Update shop information. Only the shop owner can update.',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        request=ShopCreateUpdateSerializer,
+        responses={200: ShopCreateUpdateSerializer, 400: None, 403: None}
+    )
     def patch(self, request, shop_slug):
         user = request.user
+        logger.info(f"PATCH /shops/{shop_slug}/management/ - Update request from user {user.id}")
         data = request.data.copy()  
         data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
         if str(shop.user) != str(user.id):
+            logger.warning(f"PATCH /shops/{shop_slug}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = ShopCreateUpdateSerializer(shop, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"PATCH /shops/{shop_slug}/management/ - Shop {shop.id} updated successfully")
             return Response(serializer.data, status=status.HTTP_200_OK)
         
+        logger.warning(f"PATCH /shops/{shop_slug}/management/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
     
     
+    @extend_schema(
+        operation_id='shop_delete',
+        summary='Delete a shop',
+        description='Soft delete a shop. Only the shop owner can delete.',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={204: None, 403: None}
+    )
     def delete(self, request, shop_slug):
         user = request.user
+        logger.info(f"DELETE /shops/{shop_slug}/management/ - Delete request from user {user.id}")
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
         if str(shop.user) != str(user.id):
+            logger.warning(f"DELETE /shops/{shop_slug}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         shop.is_active = False
         shop.save()
+        logger.info(f"DELETE /shops/{shop_slug}/management/ - Shop {shop.id} soft-deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -138,9 +207,19 @@ class UserShopAPIView(APIView):
     permission_classes = [AllowAny]
     http_method_names = ['get']
 
+    @extend_schema(
+        operation_id='user_shop',
+        summary='Get shop by user ID',
+        description='Retrieve the active shop for a specific user',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(name='user_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='User ID')
+        ],
+        responses={200: ShopDetailSerializer, 404: None, 500: None}
+    )
     def get(self, request, user_id):
         try:
-            shop = Shop.objects.filter(user=user_id, is_active=True).first()
+            shop = Shop.objects.filter(user=user_id, is_active=True, status=Shop.APPROVED).first()
             if not shop:
                 return Response({'error': 'User has no active shop'}, status=status.HTTP_404_NOT_FOUND)
             serializer = ShopDetailSerializer(shop)
@@ -156,8 +235,18 @@ class ShopBranchListByShopAPIView(APIView):
     """Returns a list of active branches for a given shop."""
     http_method_names = ['get']
 
+    @extend_schema(
+        operation_id='branch_list',
+        summary='List shop branches',
+        description='Get a list of active branches for a specific shop',
+        tags=['ShopBranch'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={200: ShopBranchListSerializer(many=True), 400: None}
+    )
     def get(self, request, shop_slug):
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         shop_branches = ShopBranch.objects.filter(shop=shop, is_active=True)
         if shop_branches.exists():
             serializer = ShopBranchListSerializer(shop_branches, many=True)
@@ -173,6 +262,16 @@ class ShopBranchDetailAPIView(APIView):
     """Returns detailed information about a specific branch by its slug."""
     http_method_names =['get']
 
+    @extend_schema(
+        operation_id='branch_detail',
+        summary='Get branch by slug',
+        description='Retrieve detailed information about a shop branch using its slug',
+        tags=['ShopBranch'],
+        parameters=[
+            OpenApiParameter(name='shop_branch_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Branch slug')
+        ],
+        responses={200: ShopBranchDetailSerializer, 404: None}
+    )
     def get(self, request, shop_branch_slug):
         shop_branch = get_object_or_404(ShopBranch, slug=shop_branch_slug, is_active=True)
         serializer = ShopBranchDetailSerializer(shop_branch)
@@ -185,12 +284,25 @@ class CreateShopBranchAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='branch_create',
+        summary='Create a shop branch',
+        description='Create a new branch for a shop. Only the shop owner can create branches.',
+        tags=['ShopBranch'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        request=ShopBranchCreateUpdateSerializer,
+        responses={201: ShopBranchCreateUpdateSerializer, 400: None, 403: None}
+    )
     def post(self, request, shop_slug):
         user = request.user
+        logger.info(f"POST /branches/{shop_slug}/create/ - Branch creation request from user {user.id}")
         data = request.data.copy()  
         data['user'] = str(user.id)
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
+            logger.warning(f"POST /branches/{shop_slug}/create/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopBranchCreateUpdateSerializer(
@@ -199,9 +311,11 @@ class CreateShopBranchAPIView(APIView):
                 'shop': shop
         })
         if serializer.is_valid():
-            serializer.save()
+            branch = serializer.save()
+            logger.info(f"POST /branches/{shop_slug}/create/ - Branch {branch.id} created successfully for shop {shop.id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
+        logger.warning(f"POST /branches/{shop_slug}/create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -211,27 +325,57 @@ class ShopBranchManagementAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='branch_update',
+        summary='Update a shop branch',
+        description='Update branch information. Only the shop owner can update.',
+        tags=['ShopBranch'],
+        parameters=[
+            OpenApiParameter(name='shop_branch_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Branch slug')
+        ],
+        request=ShopBranchCreateUpdateSerializer,
+        responses={200: ShopBranchCreateUpdateSerializer, 400: None, 403: None}
+    )
     def patch(self, request, shop_branch_slug):
+        user = request.user
+        logger.info(f"PATCH /branches/{shop_branch_slug}/management/ - Update request from user {user.id}")
         data = request.data
         shop_branch = get_object_or_404(ShopBranch, slug=shop_branch_slug, is_active=True)
         if str(shop_branch.shop.user) != str(request.user.id):
+            logger.warning(f"PATCH /branches/{shop_branch_slug}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopBranchCreateUpdateSerializer(shop_branch, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"PATCH /branches/{shop_branch_slug}/management/ - Branch {shop_branch.id} updated successfully")
             return Response(serializer.data, status=status.HTTP_200_OK)
         
+        logger.warning(f"PATCH /branches/{shop_branch_slug}/management/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
     
 
+    @extend_schema(
+        operation_id='branch_delete',
+        summary='Delete a shop branch',
+        description='Soft delete a shop branch. Only the shop owner can delete.',
+        tags=['ShopBranch'],
+        parameters=[
+            OpenApiParameter(name='shop_branch_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Branch slug')
+        ],
+        responses={204: None, 403: None}
+    )
     def delete(self, request, shop_branch_slug):
+        user = request.user
+        logger.info(f"DELETE /branches/{shop_branch_slug}/management/ - Delete request from user {user.id}")
         shop_branch = get_object_or_404(ShopBranch, slug=shop_branch_slug, is_active=True)
         if str(shop_branch.shop.user) != str(request.user.id):
+            logger.warning(f"DELETE /branches/{shop_branch_slug}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         shop_branch.is_active = False
         shop_branch.save()
+        logger.info(f"DELETE /branches/{shop_branch_slug}/management/ - Branch {shop_branch.id} soft-deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -241,9 +385,19 @@ class CommentListByShopAPIView(APIView):
     pagination_class = CustomPagination
     http_method_names = ['get']
 
+    @extend_schema(
+        operation_id='comment_list',
+        summary='List shop comments',
+        description='Get a paginated list of comments for a specific shop',
+        tags=['ShopComment'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={200: ShopCommentSerializer(many=True)}
+    )
     def get(self, request, shop_slug):
         pagination = self.pagination_class()
-        shop = get_object_or_404(Shop.objects.filter(is_active=True), slug=shop_slug)
+        shop = get_object_or_404(Shop.objects.filter(is_active=True, status=Shop.APPROVED), slug=shop_slug)
         comments = ShopComment.objects.filter(shop=shop)
         paginator = pagination.paginate_queryset(comments, request)
         serializer = ShopCommentSerializer(paginator, many=True)
@@ -256,17 +410,31 @@ class CreateShopCommentAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='comment_create',
+        summary='Create a shop comment',
+        description='Create a new comment for a shop. Only authenticated users can create comments.',
+        tags=['ShopComment'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        request=ShopCommentSerializer,
+        responses={201: ShopCommentSerializer, 400: None}
+    )
     def post(self, request, shop_slug):
-        user_id = request.user.id 
+        user_id = request.user.id
+        logger.info(f"POST /comments/{shop_slug}/create/ - Comment creation request from user {user_id}")
         data = request.data.copy()  
         data['user'] = str(user_id)   
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
 
         serializer = ShopCommentSerializer(data=data, context={'shop': shop})
         if serializer.is_valid():
-            serializer.save()
+            comment = serializer.save()
+            logger.info(f"POST /comments/{shop_slug}/create/ - Comment {comment.id} created successfully by user {user_id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
+        logger.warning(f"POST /comments/{shop_slug}/create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
@@ -276,27 +444,57 @@ class CommentManagementAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='comment_update',
+        summary='Update a comment',
+        description='Update a comment. Only the comment owner can update.',
+        tags=['ShopComment'],
+        parameters=[
+            OpenApiParameter(name='comment_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Comment ID')
+        ],
+        request=ShopCommentSerializer,
+        responses={200: ShopCommentSerializer, 400: None, 403: None}
+    )
     def patch(self, request, comment_id):
+        user = request.user
+        logger.info(f"PATCH /comments/{comment_id}/management/ - Update request from user {user.id}")
         data = request.data
         comment = get_object_or_404(ShopComment, id=comment_id)
         if str(comment.user) != str(request.user.id):
+            logger.warning(f"PATCH /comments/{comment_id}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopCommentSerializer(comment, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"PATCH /comments/{comment_id}/management/ - Comment {comment.id} updated successfully")
             return Response(serializer.data, status=status.HTTP_200_OK)
         
+        logger.warning(f"PATCH /comments/{comment_id}/management/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
+    @extend_schema(
+        operation_id='comment_delete',
+        summary='Delete a comment',
+        description='Soft delete a comment. Only the comment owner can delete.',
+        tags=['ShopComment'],
+        parameters=[
+            OpenApiParameter(name='comment_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Comment ID')
+        ],
+        responses={204: None, 403: None}
+    )
     def delete(self, request, comment_id):
+        user = request.user
+        logger.info(f"DELETE /comments/{comment_id}/management/ - Delete request from user {user.id}")
         comment = get_object_or_404(ShopComment, id=comment_id)
         if str(comment.user) != str(request.user.id):
+            logger.warning(f"DELETE /comments/{comment_id}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         comment.is_active = False
         comment.save()
+        logger.info(f"DELETE /comments/{comment_id}/management/ - Comment {comment.id} soft-deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -305,8 +503,18 @@ class ShopMediaByShopAPIView(APIView):
     """Returns a media for a given shop."""
     http_method_names = ['get']
 
+    @extend_schema(
+        operation_id='media_list',
+        summary='List shop media',
+        description='Get a list of media files for a specific shop',
+        tags=['ShopMedia'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={200: ShopMediaSerializer(many=True), 400: None}
+    )
     def get(self, request, shop_slug):
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         social_medias = ShopMedia.objects.filter(shop=shop)
         if social_medias.exists():
             serializer = ShopMediaSerializer(social_medias, many=True)
@@ -323,12 +531,25 @@ class CreateShopMediaAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='media_create',
+        summary='Create shop media',
+        description='Upload media files for a shop. Only the shop owner can upload media.',
+        tags=['ShopMedia'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        request=ShopMediaSerializer,
+        responses={201: ShopMediaSerializer, 400: None, 403: None}
+    )
     def post(self, request, shop_slug):
         user = request.user
+        logger.info(f"POST /media/{shop_slug}/create/ - Media creation request from user {user.id}")
         data = request.data.copy()  
         data['user'] = str(user.id)
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
+            logger.warning(f"POST /media/{shop_slug}/create/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopMediaSerializer(
@@ -337,9 +558,11 @@ class CreateShopMediaAPIView(APIView):
             'shop': shop
         })
         if serializer.is_valid():
-            serializer.save()
+            media = serializer.save()
+            logger.info(f"POST /media/{shop_slug}/create/ - Media {media.id} created successfully for shop {shop.id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
+        logger.warning(f"POST /media/{shop_slug}/create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -349,12 +572,26 @@ class DeleteShopMediaAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
     
+    @extend_schema(
+        operation_id='media_delete',
+        summary='Delete shop media',
+        description='Delete a media file. Only the shop owner can delete media.',
+        tags=['ShopMedia'],
+        parameters=[
+            OpenApiParameter(name='media_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Media ID')
+        ],
+        responses={204: None, 403: None}
+    )
     def delete(self, request, media_id):
+        user = request.user
+        logger.info(f"DELETE /media/{media_id}/delete/ - Delete request from user {user.id}")
         shop_media = get_object_or_404(ShopMedia, id=media_id)
         if str(shop_media.shop.user) != str(request.user.id):
+            logger.warning(f"DELETE /media/{media_id}/delete/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         shop_media.delete()
+        logger.info(f"DELETE /media/{media_id}/delete/ - Media {shop_media.id} deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -363,8 +600,18 @@ class ShopSocialMediaListByShopAPIView(APIView):
     """Returns a list of branches for a given shop."""
     http_method_names = ['get']
 
+    @extend_schema(
+        operation_id='social_media_list',
+        summary='List shop social media',
+        description='Get a list of social media links for a specific shop',
+        tags=['ShopSocialMedia'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        responses={200: ShopSocialMediaSerializer(many=True), 400: None}
+    )
     def get(self, request, shop_slug):
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         social_medias = ShopSocialMedia.objects.filter(shop=shop)
         if social_medias.exists():
             serializer = ShopSocialMediaSerializer(social_medias, many=True)
@@ -380,6 +627,16 @@ class ShopSocialMediaDetailAPIView(APIView):
     """Returns detailed information about a specific social media by its id."""
     http_method_names = ['get']
     
+    @extend_schema(
+        operation_id='social_media_detail',
+        summary='Get social media by ID',
+        description='Retrieve detailed information about a shop social media using its ID',
+        tags=['ShopSocialMedia'],
+        parameters=[
+            OpenApiParameter(name='social_media_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Social media ID')
+        ],
+        responses={200: ShopSocialMediaSerializer, 404: None}
+    )
     def get(self, request, social_media_id):
         social_media = get_object_or_404(ShopSocialMedia, id=social_media_id)
         serializer = ShopSocialMediaSerializer(social_media)
@@ -392,12 +649,25 @@ class CreateShopSocialMediaAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='social_media_create',
+        summary='Create shop social media',
+        description='Add social media links for a shop. Only the shop owner can add social media.',
+        tags=['ShopSocialMedia'],
+        parameters=[
+            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
+        ],
+        request=ShopSocialMediaSerializer,
+        responses={201: ShopSocialMediaSerializer, 400: None, 403: None}
+    )
     def post(self, request, shop_slug):
         user = request.user
+        logger.info(f"POST /social-media/{shop_slug}/create/ - Social media creation request from user {user.id}")
         data = request.data.copy()  
         data['user'] = str(user.id)
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
+            logger.warning(f"POST /social-media/{shop_slug}/create/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopSocialMediaSerializer(
@@ -406,9 +676,11 @@ class CreateShopSocialMediaAPIView(APIView):
                 'shop': shop
         })
         if serializer.is_valid():
-            serializer.save()
+            social_media = serializer.save()
+            logger.info(f"POST /social-media/{shop_slug}/create/ - Social media {social_media.id} created successfully for shop {shop.id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
+        logger.warning(f"POST /social-media/{shop_slug}/create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -418,24 +690,54 @@ class ShopSocialMediaManagementAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
+    @extend_schema(
+        operation_id='social_media_update',
+        summary='Update shop social media',
+        description='Update social media information. Only the shop owner can update.',
+        tags=['ShopSocialMedia'],
+        parameters=[
+            OpenApiParameter(name='social_media_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Social media ID')
+        ],
+        request=ShopSocialMediaSerializer,
+        responses={200: ShopSocialMediaSerializer, 400: None, 403: None}
+    )
     def patch(self, request, social_media_id):
+        user = request.user
+        logger.info(f"PATCH /social-media/{social_media_id}/management/ - Update request from user {user.id}")
         data = request.data
         social_media = get_object_or_404(ShopSocialMedia, id=social_media_id)
         if str(social_media.shop.user) != str(request.user.id):
+            logger.warning(f"PATCH /social-media/{social_media_id}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ShopSocialMediaSerializer(social_media, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            logger.info(f"PATCH /social-media/{social_media_id}/management/ - Social media {social_media.id} updated successfully")
             return Response(serializer.data, status=status.HTTP_200_OK)
         
+        logger.warning(f"PATCH /social-media/{social_media_id}/management/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
     
+    @extend_schema(
+        operation_id='social_media_delete',
+        summary='Delete shop social media',
+        description='Delete a social media link. Only the shop owner can delete.',
+        tags=['ShopSocialMedia'],
+        parameters=[
+            OpenApiParameter(name='social_media_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Social media ID')
+        ],
+        responses={204: None, 403: None}
+    )
     def delete(self, request, social_media_id):
+        user = request.user
+        logger.info(f"DELETE /social-media/{social_media_id}/management/ - Delete request from user {user.id}")
         social_media = get_object_or_404(ShopSocialMedia, id=social_media_id)
         if str(social_media.shop.user) != str(request.user.id):
+            logger.warning(f"DELETE /social-media/{social_media_id}/management/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
         
         social_media.delete()
+        logger.info(f"DELETE /social-media/{social_media_id}/management/ - Social media {social_media.id} deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
         
