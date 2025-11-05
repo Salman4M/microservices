@@ -8,3 +8,4 @@ staticfiles/
 media/
 Pipfile
 Pipfile.lock
+logs/
