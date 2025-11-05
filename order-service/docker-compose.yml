@@ -39,14 +39,10 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT}
       RABBITMQ_HOST: rabbitmq
-      # RABBITMQ_PORT: 5672y
+      # RABBITMQ_PORT: 5672
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
-      # Mount only your source code,
-      - ./order_service:/app/order_service:ro
-      #  NOT the entire directory
-      # - ./:/app:rw
       - media:/app/order_service/media
       - staticfiles:/app/staticfiles
       # Prevents local .venv from overwriting container packages
