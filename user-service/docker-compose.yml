@@ -43,7 +43,8 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
-      # - ./:/app:rw
+    #after last commit it started to make a problem
+      # - ./:/app:rw 
       - media:/app/user_service/media
       - staticfiles:/app/staticfiles
     #disabled for traefik
@@ -75,6 +76,7 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     # volumes:
+      #after last commit it started to make a problem
       # - ./:/app:rw
     command: python -u Core/consumer.py 
     restart: unless-stopped

@@ -18,7 +18,7 @@ services:
       
     ports:
       - "80:80" #public port for http traffic
-      - "443:443"
+      - "443:443" # secure web
       - "8080:8080" #dashboard
     
     volumes:
