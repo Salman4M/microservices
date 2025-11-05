@@ -315,3 +315,28 @@ INFO 2025-11-05 06:22:08,776 django.server "GET /openapi.json HTTP/1.1" 200 3587
 INFO 2025-11-05 06:22:58,211 django.server "GET /openapi.json HTTP/1.1" 200 3587
 INFO 2025-11-05 06:23:46,721 django.server "GET /openapi.json HTTP/1.1" 200 3587
 INFO 2025-11-05 06:24:36,059 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:34:29,490 user_events User service listening for shop.approved events…
+INFO 2025-11-05 07:34:31,264 django.utils.autoreload Watching for file changes with StatReloader
+INFO 2025-11-05 07:35:09,810 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:35:57,945 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:36:47,205 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:37:35,521 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:38:23,810 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:39:11,921 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:40:00,141 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:40:49,353 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:41:37,595 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:42:25,870 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:43:15,126 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:44:03,373 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:44:52,631 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:45:41,811 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:46:31,121 django.server "GET /openapi.json HTTP/1.1" 200 3587
+INFO 2025-11-05 07:47:20,448 django.server "GET /openapi.json HTTP/1.1" 200 3587
+ERROR 2025-11-05 11:36:25,623 user_events Connection error: 
+ERROR 2025-11-05 11:36:30,616 user_events Connection error: 
+ERROR 2025-11-05 11:36:35,627 user_events Connection error: 
+ERROR 2025-11-05 11:36:40,643 user_events Connection error: 
+ERROR 2025-11-05 11:36:45,657 user_events Connection error: 
+ERROR 2025-11-05 11:36:50,670 user_events Connection error: 
+INFO 2025-11-05 11:36:55,697 user_events User service listening for shop.approved events…
