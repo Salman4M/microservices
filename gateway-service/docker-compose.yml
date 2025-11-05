@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: gateway_service
     command: ["sh", "/app/entrypoint.sh"]
-    ports:
-      - "8002:8080"
+    # ports:
+    #   - "8002:8080"
     env_file:
       - .env
     working_dir: /app
@@ -20,6 +20,15 @@ services:
     restart: unless-stopped
     networks:
       - shared_network
+#for traefik
+    labels:
+      # Enable Traefik for the service
+      - "traefik.enable=true"
+      # Route ALL traffic to gateway
+      - "traefik.http.routers.gateway.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+
 
 networks:
   shared_network:
