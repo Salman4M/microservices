@@ -24,21 +24,22 @@ RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 # Copy all project files
 COPY . .
 
-# Change to Django project directory
-WORKDIR /app/order_service
-
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-
-# Copy and make entrypoint.sh executable as root
+# Copy and make entrypoint.sh executable (AS ROOT, BEFORE switching users)
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Create a non-root user and change ownership
+RUN useradd -m appuser && chown -R appuser:appuser /app
+
+# Create static and media directories with proper permissions (still as root)
+RUN mkdir -p /app/staticfiles /app/order_service/media && \
+    chown -R appuser:appuser /app/staticfiles /app/order_service/media
+
+# NOW switch to non-root user
 USER appuser
 
-# Create static and media directories with proper permissions
-RUN mkdir -p /app/staticfiles /app/order_service/media
-RUN chown -R appuser:appuser /app/staticfiles /app/order_service/media
+# Change to Django project directory
+WORKDIR /app/order_service
 
 # Expose port
 ENV PORT 8000
