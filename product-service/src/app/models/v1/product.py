@@ -8,7 +8,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    shop_id = Column(UUID, nullable=True) 
+    shop_id = Column(UUID, nullable=True)
     title = Column(String(100), nullable=False)
     about = Column(Text, nullable=True)
     on_sale = Column(Boolean, default=False)
