@@ -1,0 +1,45 @@
+http:
+  middlewares:
+    # CORS for all services
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlExposeHeaders:
+          - "*"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 3600
+    
+    # Security headers
+    security-headers:
+      headers:
+        frameDeny: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        customResponseHeaders:
+          X-Robots-Tag: "noindex,nofollow"
+    
+    # JWT Authentication (points to auth service)
+    auth-jwt:
+      forwardAuth:
+        address: "http://auth-service:8000/verify"
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-User-Email"
+        trustForwardHeader: true
+    
+    # Rate limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m

@@ -10,8 +10,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5436:5432"
+    # ports:
+    #   - "5436:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -42,14 +42,29 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
-      - ./:/app:rw
+      # - ./:/app:rw
       - media:/app/user_service/media
       - staticfiles:/app/staticfiles
-    ports:
-      - "${WEB_PORT:-8005}:8000"
+    # ports:
+    #   - "${WEB_PORT:-8005}:8000"
     networks:
       - internal_net
       - shared_network
+
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      
+      # HTTP Router
+      - "traefik.http.routers.user.rule=PathPrefix(`/user`)"
+      - "traefik.http.routers.user.entrypoints=web"
+      - "traefik.http.services.user.loadbalancer.server.port=8000"
+      
+      # Middlewares
+      - "traefik.http.routers.user.middlewares=user-strip,cors-headers,security-headers"
+      
+      # Strip /user prefix before forwarding
+      - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user"
 
   shop_consumer:
     build: .
@@ -72,8 +87,8 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
-    volumes:
-      - ./:/app:rw
+    # volumes:
+    #   - ./:/app:rw
     command: python -u Core/consumer.py 
     restart: unless-stopped
     networks:
