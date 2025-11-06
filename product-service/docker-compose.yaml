@@ -11,8 +11,8 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
     command: >
       sh -c ". .venv/bin/activate && alembic upgrade head && uvicorn src.app.main:app --host 0.0.0.0 --port 8000"
-    ports:
-      - "8006:8000"
+    # ports:
+    #   - "8006:8000"
     networks:
       - internal_net
       - shared_network
@@ -27,8 +27,8 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5437:5432"
+    # ports:
+    #   - "5437:5432"
     networks:
       - internal_net
 
