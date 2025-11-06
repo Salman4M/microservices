@@ -77,12 +77,12 @@ services:
       DB_USER: postgres
       DB_PASSWORD: "4444"
       DB_NAME: shopcart_db
-      # DB_PORT: 5432
+      DB_PORT: 5432
       SECRET_KEY: d4a18b05f4a744a6a2d9981c57cb07a635fe01912c994e5f68b4db7b6b6a7f2d
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       RABBITMQ_HOST: rabbitmq
-      # RABBITMQ_PORT: 5672
+      RABBITMQ_PORT: 5672
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     depends_on:
