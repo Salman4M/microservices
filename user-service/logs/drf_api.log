@@ -340,3 +340,4 @@ ERROR 2025-11-05 11:36:40,643 user_events Connection error:
 ERROR 2025-11-05 11:36:45,657 user_events Connection error: 
 ERROR 2025-11-05 11:36:50,670 user_events Connection error: 
 INFO 2025-11-05 11:36:55,697 user_events User service listening for shop.approved events…
+INFO 2025-11-06 06:19:10,252 django.utils.autoreload Watching for file changes with StatReloader
