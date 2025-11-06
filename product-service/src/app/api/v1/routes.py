@@ -75,10 +75,16 @@ async def create_product(product: ProductCreate, request: Request, db: Session =
             status_code=400, 
             detail="User does not have a shop"
         )
-    product_data = product.dict()
-    product_data['shop_id'] = shop_id
+    # product_data = product.dict()
+    # product_data['shop_id'] = shop_id
+    # repo = ProductRepository(db)
+    # result = repo.create(product_data)
+        # ✅ assign shop_id directly into Pydantic model
+    product.shop_id = shop_id
+
     repo = ProductRepository(db)
-    result = repo.create(product_data)
+    # ✅ use the version that excludes category_ids before insert
+    result = repo.create_with_categories(product)
     return result
 
 

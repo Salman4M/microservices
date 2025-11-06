@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 import logging
-
+from utils.rabbitmq_producer import rabbitmq_producer
 from utils.shopcart_client import shopcart_client
 from utils.product_client import product_client
 from utils.shop_client import shop_client
@@ -103,10 +103,16 @@ def create_order_from_shopcart(request):
 
     if not shopcart_data:
         return Response({"detail": "Shopcart not found"}, status=status.HTTP_404_NOT_FOUND)
-
+    
+    cart_id = shopcart_data.get('id')
     items = shopcart_data.pop('items', [])
-    order_data = {"user_id": user_id}
 
+    if not items:
+        return Response({"detail": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+    logger.info(f'Creating order from shopcart - User: {user_id}, Cart ID: {cart_id}, Items: {len(items)}')
+    order_data = {"user_id": user_id}
+    logger.info("This is your items {items}")
     order_serializer = OrderSerializer(data=order_data)
     if order_serializer.is_valid():
         order = order_serializer.save()
@@ -118,14 +124,14 @@ def create_order_from_shopcart(request):
     for item in items:
         order_item_data = {
             'order': order.id,  # bu sətri dəyişəcəyik
-            'product_variation': item.get('product_variation'),
+            'product_variation': item.get('product_variation_id'),
             'quantity': item.get('quantity', 1),
             'status': 1,  
             'price': 0  
         }
 
         # ✅ Əsas dəyişiklik: order instance göndəririk, id yox
-        order_item_data['order'] = order
+        # order_item_data['order'] = order
 
         item_serializer = OrderItemSerializer(data=order_item_data)
         if item_serializer.is_valid():
@@ -134,10 +140,30 @@ def create_order_from_shopcart(request):
             logger.error(f'Order item serializer errors: {item_serializer.errors}')
             return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    try:
+        success = rabbitmq_producer.publish_order_created(
+            order_id=order.id,
+            user_uuid=user_id,
+            cart_id=cart_id
+        )
+        
+        if success:
+            logger.info(f'✅ Published order.created event - Order: {order.id}, Cart: {cart_id}')
+        else:
+            logger.warning(f'⚠️ Failed to publish order.created event - Order: {order.id}')
+    except Exception as e:
+        logger.error(f'❌ Error publishing order.created event: {e}')
+        # Don't fail the order creation if event publishing fails
+
     return Response(
-        {"message": "Order and items created successfully"},
+        {
+            "message": "Order created successfully",
+            "order_id": order.id,
+            "items_count": len(items)
+        },
         status=status.HTTP_201_CREATED
     )
+
 
 
 @api_view(['PATCH'])

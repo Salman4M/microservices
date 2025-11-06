@@ -39,7 +39,7 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT}
       RABBITMQ_HOST: rabbitmq
-      # RABBITMQ_PORT: 5672
+      RABBITMQ_PORT: 5672
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
