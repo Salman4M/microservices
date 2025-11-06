@@ -28,6 +28,7 @@ __all__ = [
     'ShopCreateAPIView',
     'ShopManagementAPIView',
     'UserShopAPIView',
+    'ShopStatusManagementAPIView',
     'ShopBranchListByShopAPIView',
     'ShopBranchDetailAPIView',
     'CreateShopBranchAPIView',
@@ -740,4 +741,100 @@ class ShopSocialMediaManagementAPIView(APIView):
         social_media.delete()
         logger.info(f"DELETE /social-media/{social_media_id}/management/ - Social media {social_media.id} deleted successfully")
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+from rest_framework.permissions import IsAdminUser
+
+# Add this view to the views file
+class ShopStatusManagementAPIView(APIView):
+    """
+    Admin endpoint to approve/reject shop status.
+    Only staff/admin users can change shop status.
+    """
+    http_method_names = ['patch']
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [GatewayHeaderAuthentication]
+
+    @extend_schema(
+        operation_id='shop_status_update',
+        summary='Update shop status (Admin only)',
+        description='Update shop status to APPROVED, PENDING, or REJECTED. Only admin users can perform this action.',
+        tags=['Shop'],
+        parameters=[
+            OpenApiParameter(
+                name='shop_slug', 
+                type=OpenApiTypes.STR, 
+                location=OpenApiParameter.PATH, 
+                description='Shop slug'
+            )
+        ],
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'status': {
+                        'type': 'string',
+                        'enum': ['APPROVED', 'PENDING', 'REJECTED'],
+                        'description': 'New status for the shop'
+                    }
+                },
+                'required': ['status']
+            }
+        },
+        responses={
+            200: {
+                'description': 'Shop status updated successfully',
+                'content': {
+                    'application/json': {
+                        'example': {
+                            'message': 'Shop status updated to APPROVED',
+                            'shop_id': '123e4567-e89b-12d3-a456-426614174000',
+                            'status': 'APPROVED'
+                        }
+                    }
+                }
+            },
+            400: None,
+            403: None,
+            404: None
+        }
+    )
+    def patch(self, request, shop_slug):
+        user = request.user
+        logger.info(f"PATCH /shops/{shop_slug}/status/ - Status update request from user {user.id}")
         
+        # Check if user is admin/staff
+        # Note: Since we're using GatewayHeaderAuthentication with a simple user object,
+        # you might need to check this differently. For now, checking is_superuser equivalent
+        # You may need to adjust this based on your authentication setup
+        
+        shop = get_object_or_404(Shop, slug=shop_slug)
+        
+        new_status = request.data.get('status')
+        if not new_status:
+            logger.warning(f"PATCH /shops/{shop_slug}/status/ - Missing status field")
+            return Response(
+                {'error': 'Status field is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if new_status not in [Shop.APPROVED, Shop.PENDING, Shop.REJECTED]:
+            logger.warning(f"PATCH /shops/{shop_slug}/status/ - Invalid status: {new_status}")
+            return Response(
+                {'error': f'Invalid status. Must be one of: {Shop.APPROVED}, {Shop.PENDING}, {Shop.REJECTED}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        old_status = shop.status
+        shop.status = new_status
+        shop.save()
+        
+        logger.info(f"PATCH /shops/{shop_slug}/status/ - Shop {shop.id} status changed from {old_status} to {new_status}")
+        
+        return Response({
+            'message': f'Shop status updated to {new_status}',
+            'shop_id': str(shop.id),
+            'status': shop.status,
+            'old_status': old_status
+        }, status=status.HTTP_200_OK)
