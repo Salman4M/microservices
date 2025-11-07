@@ -17,6 +17,19 @@ services:
     networks:
       - shared_network
 
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+
+      # Route dashboard via http://rabbitmq.localhost
+      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.localhost`)"
+      - "traefik.http.routers.rabbitmq.entrypoints=web"
+
+      # Service listens internally on 15672
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+
+    
+
 networks:
   shared_network:
     external: true

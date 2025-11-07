@@ -21,6 +21,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = [
+    "shop.localhost",
     "localhost",
     "127.0.0.1",
     "shop-service-814454543179.europe-west1.run.app",
