@@ -8,8 +8,8 @@ services:
       POSTGRES_DB: ecommerce_db
       POSTGRES_USER: ecommerce_user
       POSTGRES_PASSWORD: 12345
-    ports:
-      - "5435:5432"
+    # ports:
+    #   - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -17,12 +17,24 @@ services:
     build: .
     container_name: ecommerce-web
     command: bash -c "./entrypoint.sh"
-    ports:
-      - "8004:8000"
+    # ports:
+    #   - "8004:8000"
     env_file:
       - .env
     depends_on:
       - db
+    labels:
+      # 🔒 Enable Traefik routing only for admin panel
+      - "traefik.enable=true"
+      
+      # Route only /admin/* to this service
+      - "traefik.http.routers.analytic-admin.rule=Host(`analytic.localhost`) && PathPrefix(`/admin`)"
+      
+      # Use same web entrypoint (port 80)
+      - "traefik.http.routers.analytic-admin.entrypoints=web"
+      
+      # Define the internal service port Django runs on
+      - "traefik.http.services.analytic-admin.loadbalancer.server.port=8000"
 
 volumes:
   postgres_data:
