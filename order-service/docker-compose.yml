@@ -10,6 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    #disabled for traefik
     # ports:
     #   - "5434:5432"
     healthcheck:
@@ -42,21 +43,30 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
-      # - ./:/app:rw
       - media:/app/order_service/media
       - staticfiles:/app/staticfiles
+      # Prevents local .venv from overwriting container packages
+      - /app/.venv
+    #disabled for traefik
     # ports:
     #   - "${WEB_PORT:-8003}:8000"
     networks:
       - internal_net
       - shared_network
+
     labels:
+      #  Enable Traefik routing only for admin panel
       - "traefik.enable=true"
-      - "traefik.http.routers.order.rule=PathPrefix(`/order`)"
-      - "traefik.http.routers.order.entrypoints=web"
-      - "traefik.http.services.order.loadbalancer.server.port=8000"
-      - "traefik.http.routers.order.middlewares=order-strip,auth-jwt,cors-headers,security-headers"
-      - "traefik.http.middlewares.order-strip.stripprefix.prefixes=/order"
+      
+      # Route only /admin/* to this service
+      - "traefik.http.routers.order-admin.rule=PathPrefix(`/order-admin`)"
+      
+      # Use same web entrypoint (port 80)
+      - "traefik.http.routers.order-admin.entrypoints=web"
+      
+      # Define the internal service port Django runs on
+      - "traefik.http.services.order-admin.loadbalancer.server.port=8000"
+
 
 volumes:
   pgdata:

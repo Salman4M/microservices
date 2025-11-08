@@ -10,6 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    #disabled for traefik
     # ports:
     #   - "5436:5432"
     healthcheck:
@@ -25,6 +26,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: on-failure
     env_file:
       - .env
     environment:
@@ -42,9 +44,11 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     volumes:
-      # - ./:/app:rw
+    #after last commit it started to make a problem
+      # - ./:/app:rw 
       - media:/app/user_service/media
       - staticfiles:/app/staticfiles
+    #disabled for traefik
     # ports:
     #   - "${WEB_PORT:-8005}:8000"
     networks:
@@ -52,19 +56,17 @@ services:
       - shared_network
 
     labels:
-      # Enable Traefik
+      #  Enable Traefik routing only for admin panel
       - "traefik.enable=true"
       
-      # HTTP Router
-      - "traefik.http.routers.user.rule=PathPrefix(`/user`)"
-      - "traefik.http.routers.user.entrypoints=web"
-      - "traefik.http.services.user.loadbalancer.server.port=8000"
+      # Route only /admin/* to this service
+      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
       
-      # Middlewares
-      - "traefik.http.routers.user.middlewares=user-strip,cors-headers,security-headers"
+      # Use same web entrypoint (port 80)
+      - "traefik.http.routers.user-admin.entrypoints=web"
       
-      # Strip /user prefix before forwarding
-      - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user"
+      # Define the internal service port Django runs on
+      - "traefik.http.services.user-admin.loadbalancer.server.port=8000"
 
   shop_consumer:
     build: .
@@ -88,7 +90,8 @@ services:
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
     # volumes:
-    #   - ./:/app:rw
+      #after last commit it started to make a problem
+      # - ./:/app:rw
     command: python -u Core/consumer.py 
     restart: unless-stopped
     networks:

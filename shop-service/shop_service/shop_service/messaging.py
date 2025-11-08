@@ -1,9 +1,12 @@
 import pika
 import json
 import os
+import logging
 from dotenv import load_dotenv
 
+
 load_dotenv()
+logger = logging.getLogger('shop_service')
 
 
 class RabbitMQPublisher:
@@ -25,7 +28,7 @@ class RabbitMQPublisher:
         return pika.BlockingConnection(parameters)
     
     def publish_shop_created(self, user_uuid: str, shop_id: str):
-        """Publish shop.created event when a shop is created"""
+        """Publish shop.approved event when a shop status changes to APPROVED"""
         try:
             connection = self.get_connection()
             channel = connection.channel()
@@ -37,15 +40,15 @@ class RabbitMQPublisher:
             )
             
             message = {
-                'event_type': 'shop.created',
+                'event_type': 'shop.approved',
                 'user_uuid': str(user_uuid),
                 'shop_id': str(shop_id),
-                'is_shop_owner': True  # User is now a seller
+                'is_shop_owner': True
             }
             
             channel.basic_publish(
                 exchange='shop_events',
-                routing_key='shop.created',
+                routing_key='shop.approved',
                 body=json.dumps(message),
                 properties=pika.BasicProperties(
                     delivery_mode=2,
@@ -53,11 +56,12 @@ class RabbitMQPublisher:
                 )
             )
             
-            print(f"✅ Published shop.created event for user {user_uuid}, shop {shop_id}")
+            logger.info(f"published shop.approved event | user={user_uuid} shop={shop_id}")
             connection.close()
             
         except Exception as e:
-            print(f"❌ Failed to publish shop.created event: {e}")
+            logger.error(f"failed to publish shop.approved event: {e}", exc_info=True)
 
 
+# Create a singleton instance of the publisher
 publisher = RabbitMQPublisher()

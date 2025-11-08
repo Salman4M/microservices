@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from .services import SERVICE_URLS
 
 
-async def fetch_openapi(service_name: str, url: str, retries: int = 6, delay: int = 2):
+async def fetch_openapi(service_name: str, url: str, retries: int = 3, delay: int = 2):
 	for attempt in range(retries):
 		try:
 			async with httpx.AsyncClient(timeout=5.0) as client:

@@ -45,16 +45,17 @@ class ShopDetailSerializer(serializers.ModelSerializer):
 
 
 class ShopCreateUpdateSerializer(serializers.ModelSerializer):
-    user = serializers.UUIDField(write_only=True)
-    
+    profile = serializers.ImageField(required=False)
+
     class Meta:
         model = Shop
         fields = [
+            'user',
             'name',
             'about',
             'profile',
-            'user',
         ]
+        read_only_fields = ['user']
 
 
 class ShopBranchListSerializer(serializers.ModelSerializer):
@@ -109,7 +110,6 @@ class ShopBranchCreateUpdateSerializer(serializers.ModelSerializer):
 
 
 class ShopCommentSerializer(serializers.ModelSerializer):
-    user = serializers.UUIDField(write_only=True)
     shop = serializers.PrimaryKeyRelatedField(read_only=True)
     
     class Meta:

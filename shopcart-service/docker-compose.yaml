@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: shopcart_service
     command: ["sh", "/app/entrypoint.sh"]
+    #disabled for traefik
     # ports:
     #   - "8008:8000"
     env_file:
@@ -38,13 +39,6 @@ services:
     networks:
       - internal_net
       - shared_network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.cart.rule=PathPrefix(`/cart`)"
-      - "traefik.http.routers.cart.entrypoints=web"
-      - "traefik.http.services.cart.loadbalancer.server.port=8000"
-      - "traefik.http.routers.cart.middlewares=cart-strip,auth-jwt,cors-headers,security-headers"
-      - "traefik.http.middlewares.cart-strip.stripprefix.prefixes=/cart"
 
   db:
     image: postgres:16-alpine
@@ -56,6 +50,7 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    #disabled for traefik
     # ports:
     #   - "5439:5432"
     healthcheck:
@@ -76,6 +71,7 @@ services:
     env_file:
       - .env
     environment:
+      PYTHONPATH: /app/src
       DATABASE_URL: postgresql+psycopg://postgres:4444@db:5432/shopcart_db
       DB_HOST: db
       DB_USER: postgres

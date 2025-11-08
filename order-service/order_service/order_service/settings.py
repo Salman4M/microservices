@@ -17,7 +17,13 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    "order.localhost",
+    "order_service",
+    "localhost",
+    "127.0.0.1",
+    "*",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8080",
@@ -177,42 +183,28 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
 }
 
-# Logging configuration
+# Logging settings
+LOGGING_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGGING_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
+        'default': {'format': '{levelname} {asctime} {name} {message}', 'style': '{'},
     },
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
+        'file': {'class': 'logging.FileHandler', 'filename': os.path.join(LOGGING_DIR, 'drf_api.log'), 'formatter': 'default'},
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'default'},
     },
+    # Root logger bütün modullardan gələn logları qəbul etsin
     'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
+        'handlers': ['file', 'console'],
+        'level': 'INFO',
     },
     'loggers': {
-        'order_service': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'order_service.utils': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
+        'django': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
+        # İstəsəniz ayrıca namespace üçün də logger verə bilərsiniz
+        'order_service': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': False},
+        'shop_service': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': False},
     },
 }
-
-print(f"🚀 Django starting... Debug={DEBUG}, Port={os.getenv('PORT')}")

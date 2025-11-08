@@ -19,4 +19,5 @@ dependencies = [
     "pytest-django>=4.11.1",
     "python-dotenv>=1.1.1",
     "whitenoise>=6.5",
+    "requests>=2.32.3",
 ]

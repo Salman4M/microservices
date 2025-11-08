@@ -31,10 +31,10 @@ PUBLIC_PATHS = [
 
 PUBLIC_ENDPOINTS = {
     # User endpoints
-    '/user/api/user/login': ['POST'],
-    '/user/api/user/register': ['POST'],
-    '/user/api/user/password-reset/request': ['POST'],
-    '/user/api/user/password-reset/confirm': ['POST'],
+    '/user/api/user/login/': ['POST'],
+    '/user/api/user/register/': ['POST'],
+    '/user/api/user/password-reset/request/': ['POST'],
+    '/user/api/user/password-reset/confirm/': ['POST'],
 
     # Shop endpoints
     '/shop/api/shops/': ['GET'],
@@ -77,39 +77,17 @@ def is_token_blacklisted(token: str) -> bool:
 
 
 def is_endpoint_public(path: str, method: str) -> bool:
-    """Check if an endpoint is public (doesn't require authentication)"""
-    
-    # Check exact path matches first
     if any(path == p or path.startswith(p + '/') for p in PUBLIC_PATHS):
         return True
     
-    # ✅ NEW: Normalize path - remove trailing slashes for comparison
-    normalized_path = path.rstrip('/')
-    
-    # Check public endpoints with pattern matching
     for public_path, allowed_methods in PUBLIC_ENDPOINTS.items():
-        # ✅ NEW: Normalize the public path pattern too
-        normalized_pattern = public_path.rstrip('/')
+        pattern = re.sub(r'\{[^}]+\}', '[^/]+', public_path)
         
-        # Replace {param} with regex pattern to match any value
-        pattern = re.sub(r'\{[^}]+\}', r'[^/]+', normalized_pattern)
-        
-        # ✅ NEW: Add anchors for exact matching
-        full_pattern = f'^{pattern}$'
-        
-        # Check if path matches pattern
-        if re.match(full_pattern, normalized_path):
+        if re.match(pattern + '$', path):
             if method.upper() in [m.upper() for m in allowed_methods]:
-                # ✅ NEW: Added logging
-                logger.info(f"Path {path} matched public pattern {public_path} for method {method}")
                 return True
-            else:
-                # ✅ NEW: Added logging for debugging
-                logger.warning(f"Path {path} matched pattern {public_path} but method {method} not allowed")
-                return False
+            return False
     
-    # ✅ NEW: Added logging
-    logger.info(f"Path {path} is not public, authentication required")
     return False
 
 
@@ -137,9 +115,11 @@ async def verify_jwt(request: Request):
         )
     
     token = auth_header.split(" ")[1]
-    if is_token_blacklisted(token):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked (logged out).")
-    
+    try:
+        if is_token_blacklisted(token):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked (logged out).")
+    except Exception as e:
+        logger.error(f"Blacklist check failed: {e}")
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         request.state.user = payload  
@@ -198,4 +178,3 @@ async def handle_logout(request: Request):
     return JSONResponse({
         "detail": "Successfully logged out"
     }, status_code=200)
-

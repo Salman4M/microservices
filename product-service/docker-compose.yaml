@@ -9,6 +9,8 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
+    volumes:
+      - ./src:/app/src:rw
     command: >
       sh -c ". .venv/bin/activate && alembic upgrade head && uvicorn src.app.main:app --host 0.0.0.0 --port 8000"
     # ports:

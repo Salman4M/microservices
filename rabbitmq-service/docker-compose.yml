@@ -4,9 +4,10 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
-    ports:
-      - "5672:5672"    
-      - "15672:15672"  
+    #disabled for traefik
+    # ports:
+    #   - "5672:5672"    #internal communication
+      # - "15672:15672"  #dashboard
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
@@ -15,6 +16,23 @@ services:
     restart: always
     networks:
       - shared_network
+
+    labels:
+      - "traefik.enable=true"
+      
+      # Path-based: http://localhost/rabbitmq
+      - "traefik.http.routers.rabbitmq-ui.rule=Host(`localhost`) && PathPrefix(`/rabbitmq`)"
+      - "traefik.http.routers.rabbitmq-ui.entrypoints=web"
+      
+      # Strip /rabbitmq prefix
+      - "traefik.http.middlewares.rabbitmq-strip.stripprefix.prefixes=/rabbitmq"
+      - "traefik.http.routers.rabbitmq-ui.middlewares=rabbitmq-strip"
+      
+      # Service port
+      - "traefik.http.services.rabbitmq-ui.loadbalancer.server.port=15672"
+      - "traefik.http.routers.rabbitmq-ui.service=rabbitmq-ui"
+
+    
 
 networks:
   shared_network:
