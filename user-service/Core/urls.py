@@ -6,7 +6,9 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 from rest_framework.renderers import JSONRenderer
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls),
+   path('user-admin/', admin.site.urls),
+
     path('api/user/', include('user_service.urls')),
     
 ]

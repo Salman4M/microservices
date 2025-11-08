@@ -39,6 +39,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: ${POSTGRES_PORT}
+
     volumes:
       - ./:/app:rw
       - media:/app/shop_service/media
@@ -52,26 +53,12 @@ services:
       - shared_network
 
     labels:
-      # 🔒 Enable Traefik routing only for admin panel
+      # Enable Traefik routing only for admin panel
       - "traefik.enable=true"
-      
-      # Route only /admin/* to this service
-      - "traefik.http.routers.shop-admin.rule=Host(`shop.localhost`) && PathPrefix(`/admin`)"
-      
-      # Use same web entrypoint (port 80)
+      - "traefik.http.routers.shop-admin.rule=PathPrefix(`/shop-admin`)"
       - "traefik.http.routers.shop-admin.entrypoints=web"
-      
-      # Define the internal service port Django runs on
       - "traefik.http.services.shop-admin.loadbalancer.server.port=8000"
       
-      # Optional: Strip prefix if you route via /shop/admin instead
-      # - "traefik.http.middlewares.shop-strip.stripprefix.prefixes=/shop"
-      # - "traefik.http.routers.shop-admin.middlewares=shop-strip"
-      
-      # Optional: add HTTP basic auth for extra security
-      # (user = admin, password = mypass)
-      # - "traefik.http.middlewares.admin-auth.basicauth.users=admin:$$apr1$$Dvl1KsmJ$$kIDvjg0tH8ikgm0MZJ8zU/"
-      # - "traefik.http.routers.shop-admin.middlewares=admin-auth"
 
 volumes:
   pgdata:

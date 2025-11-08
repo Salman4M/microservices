@@ -56,11 +56,11 @@ services:
       - shared_network
 
     labels:
-      # 🔒 Enable Traefik routing only for admin panel
+      #  Enable Traefik routing only for admin panel
       - "traefik.enable=true"
       
       # Route only /admin/* to this service
-      - "traefik.http.routers.user-admin.rule=Host(`user.localhost`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
       
       # Use same web entrypoint (port 80)
       - "traefik.http.routers.user-admin.entrypoints=web"

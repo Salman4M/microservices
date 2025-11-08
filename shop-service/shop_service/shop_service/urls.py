@@ -7,7 +7,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # path('admin/', admin.site.urls)
+    path('shop-admin/', admin.site.urls), 
     path('api/', include('shops.urls_v1')),
 ]
 
