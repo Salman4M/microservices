@@ -53,28 +53,34 @@ services:
       # Define service once
       - "traefik.http.services.user-api.loadbalancer.server.port=8000"
       
-      # Define StripPrefix middleware to remove /user prefix
-      - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user/api,/user"
+      # Middleware to strip /user prefix
+      - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user"
       
-      # PRIORITY 3: Public routes (NO AUTH - register, internal validation)
-      - "traefik.http.routers.user-public.rule=PathPrefix(`/user/api/register`) || PathPrefix(`/user/internal`)"
-      - "traefik.http.routers.user-public.entrypoints=web"
-      - "traefik.http.routers.user-public.service=user-api"
-      - "traefik.http.routers.user-public.middlewares=user-strip"
-      - "traefik.http.routers.user-public.priority=3"
+      # PRIORITY 3: Registration (NO AUTH - highest priority for /register)
+      - "traefik.http.routers.user-register.rule=PathPrefix(`/user/api/register`)"
+      - "traefik.http.routers.user-register.entrypoints=web"
+      - "traefik.http.routers.user-register.service=user-api"
+      - "traefik.http.routers.user-register.middlewares=user-strip"
+      - "traefik.http.routers.user-register.priority=3"
       
-      # PRIORITY 2: Admin panel (NO AUTH)
-      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
-      - "traefik.http.routers.user-admin.entrypoints=web"
-      - "traefik.http.routers.user-admin.service=user-api"
-      - "traefik.http.routers.user-admin.priority=2"
+      # PRIORITY 2: Internal validation (NO AUTH)
+      - "traefik.http.routers.user-internal.rule=PathPrefix(`/user/api/internal`)"
+      - "traefik.http.routers.user-internal.entrypoints=web"
+      - "traefik.http.routers.user-internal.service=user-api"
+      - "traefik.http.routers.user-internal.middlewares=user-strip"
+      - "traefik.http.routers.user-internal.priority=2"
       
-      # PRIORITY 1: Protected routes (WITH AUTH - profile, etc.)
+      # PRIORITY 1: Protected routes (WITH AUTH - lowest priority)
       - "traefik.http.routers.user-protected.rule=PathPrefix(`/user/api`)"
       - "traefik.http.routers.user-protected.entrypoints=web"
       - "traefik.http.routers.user-protected.service=user-api"
       - "traefik.http.routers.user-protected.middlewares=user-strip,auth-verify@file"
       - "traefik.http.routers.user-protected.priority=1"
+      
+      # Admin panel (NO AUTH)
+      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
+      - "traefik.http.routers.user-admin.entrypoints=web"
+      - "traefik.http.routers.user-admin.service=user-api"
 
   shop_consumer:
     build: .
