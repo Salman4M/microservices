@@ -1,16 +1,13 @@
-#main.py
-
 import os
 import httpx
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Set
-from fastapi import FastAPI, HTTPException, status, Depends
+from typing import Optional
+from fastapi import FastAPI, HTTPException, status, Depends, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from jose import jwt, JWTError
 from dotenv import load_dotenv
-
 import redis
 import logging
 
@@ -23,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 JWT_SECRET = os.getenv('JWT_SECRET')
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
-ACCESS_TOKEN_LIFETIME_MINUTES = int(os.getenv('ACCESS_TOKEN_LIFETIME_MINUTES', 15))
+ACCESS_TOKEN_LIFETIME_MINUTES = int(os.getenv('ACCESS_TOKEN_LIFETIME_MINUTES', 60))
 REFRESH_TOKEN_LIFETIME_DAYS = int(os.getenv('REFRESH_TOKEN_LIFETIME_DAYS', 7))
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis_service')
 REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
@@ -70,17 +67,12 @@ class RefreshTokenRequest(BaseModel):
 class VerifyTokenRequest(BaseModel):
     token: str
 
-class TokenPayload(BaseModel):
-    sub: str
-    exp: int
-    iat: int
-
 # Helper Functions
 def add_to_blacklist(token: str):
     """Add token to blacklist in Redis"""
     try:
         redis_client.sadd("blacklisted_tokens", token)
-        logger.info(f"Token added to blacklist")
+        logger.info("Token added to blacklist")
     except Exception as e:
         logger.error(f"Failed to blacklist token: {e}")
 
@@ -133,11 +125,12 @@ def verify_token(token: str) -> dict:
         )
 
 async def authenticate_user(email: str, password: str) -> Optional[dict]:
-    """Authenticate user via User Service"""
+    """Authenticate user via User Service internal endpoint"""
     try:
+        # Call the internal validation endpoint (not routed through Traefik)
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f'{USER_SERVICE_URL}/api/user/login/',
+                f'{USER_SERVICE_URL}/api/user/internal/validate-credentials/',
                 json={'email': email, 'password': password},
                 timeout=10.0
             )
@@ -147,6 +140,12 @@ async def authenticate_user(email: str, password: str) -> Optional[dict]:
         else:
             logger.warning(f"Login failed for {email}: {response.status_code}")
             return None
+    except httpx.ConnectError as e:
+        logger.error(f"Cannot connect to User Service at {USER_SERVICE_URL}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="User service is unavailable"
+        )
     except Exception as e:
         logger.error(f"User service communication error: {e}")
         raise HTTPException(
@@ -157,7 +156,7 @@ async def authenticate_user(email: str, password: str) -> Optional[dict]:
 # Endpoints
 @app.get("/")
 def root():
-    """Health check endpoint"""
+    """Root endpoint"""
     return {
         "service": "Auth Service",
         "status": "running",
@@ -170,8 +169,9 @@ def health():
     redis_status = "healthy"
     try:
         redis_client.ping()
-    except:
+    except Exception as e:
         redis_status = "unhealthy"
+        logger.error(f"Redis health check failed: {e}")
     
     return {
         "status": "healthy" if redis_status == "healthy" else "degraded",
@@ -181,6 +181,8 @@ def health():
 @app.post("/api/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest):
     """Login endpoint - authenticates user and returns JWT tokens"""
+    logger.info(f"Login attempt for: {credentials.email}")
+    
     user_data = await authenticate_user(credentials.email, credentials.password)
     
     if not user_data:
@@ -238,7 +240,7 @@ def refresh(request: RefreshTokenRequest):
 
 @app.post("/api/verify")
 def verify(request: VerifyTokenRequest):
-    """Verify token validity"""
+    """Verify token validity (for internal use)"""
     try:
         payload = verify_token(request.token)
         return {
@@ -248,6 +250,31 @@ def verify(request: VerifyTokenRequest):
         }
     except HTTPException:
         return {"valid": False}
+
+@app.get("/api/verify-forward")
+@app.post("/api/verify-forward")
+async def verify_forward(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    ForwardAuth endpoint for Traefik middleware.
+    Verifies token and returns user UUID in X-User-ID header.
+    """
+    token = credentials.credentials
+    
+    try:
+        payload = verify_token(token)
+        user_uuid = payload.get('sub')
+        
+        # Return response with X-User-ID header
+        response = Response(status_code=200)
+        response.headers["X-User-ID"] = str(user_uuid)
+        logger.debug(f"Verified token for user: {user_uuid}")
+        return response
+        
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
 
 @app.post("/api/logout")
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -285,27 +312,10 @@ def revoke_refresh(request: RefreshTokenRequest):
             detail="Token revocation failed"
         )
 
-# Metrics endpoint for Prometheus
 @app.get("/metrics")
 def metrics():
     """Prometheus metrics endpoint"""
     blacklist_size = redis_client.scard("blacklisted_tokens")
     return {
         "blacklisted_tokens": blacklist_size
-    }
-
-
-@app.get("/health")
-def health():
-    """Health check with service dependencies"""
-    redis_status = "healthy"
-    try:
-        redis_client.ping()
-    except Exception as e:  # ← Catch specific exception
-        redis_status = "unhealthy"
-        logger.error(f"Redis health check failed: {e}")
-    
-    return {
-        "status": "healthy" if redis_status == "healthy" else "degraded",
-        "redis": redis_status
     }

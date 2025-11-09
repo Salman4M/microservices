@@ -58,16 +58,23 @@ services:
     labels:
       - "traefik.enable=true"
       
-      # API routes (protected)
+      # Public routes (register, login via Django - no auth needed)
+      - "traefik.http.routers.user-public.rule=PathPrefix(`/user/api/register`) || PathPrefix(`/user/api/login`)"
+      - "traefik.http.routers.user-public.entrypoints=web"
+      - "traefik.http.services.user-public.loadbalancer.server.port=8000"
+      
+      # Protected routes (profile, etc.)
       - "traefik.http.routers.user-api.rule=PathPrefix(`/user/api`)"
       - "traefik.http.routers.user-api.entrypoints=web"
+      - "traefik.http.routers.user-api.service=user-api"
       - "traefik.http.services.user-api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.user-api.middlewares=auth-verify"
+      - "traefik.http.routers.user-api.middlewares=auth-verify@file"
+      - "traefik.http.routers.user-api.priority=1"  # Lower priority than public routes
       
-      # Admin panel (no auth)
-      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
-      - "traefik.http.routers.user-admin.entrypoints=web"
-      - "traefik.http.services.user-admin.loadbalancer.server.port=8000"
+      # Docs routes (no auth)
+      - "traefik.http.routers.user-docs.rule=PathPrefix(`/user/docs`) || PathPrefix(`/user/admin`)"
+      - "traefik.http.routers.user-docs.entrypoints=web"
+      - "traefik.http.routers.user-docs.service=user-api"
   shop_consumer:
     build: .
     container_name: user_shop_consumer

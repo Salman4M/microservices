@@ -26,7 +26,7 @@ services:
       - "traefik.http.routers.product-api.rule=PathPrefix(`/product/api`)"
       - "traefik.http.routers.product-api.entrypoints=web"
       - "traefik.http.services.product-api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.product-api.middlewares=auth-verify"
+      - "traefik.http.routers.product-api.middlewares=auth-verify@file"
   db:
     image: postgres:15
     container_name: product_postgres_db

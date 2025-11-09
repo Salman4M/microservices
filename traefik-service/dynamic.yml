@@ -1,9 +1,7 @@
-# Dynamic configuration for Traefik middleware
-# This file is mounted into Traefik container
-
+# dynamic.yml
 http:
   middlewares:
-    # ForwardAuth middleware - sends requests to Auth Service for verification
+    # Auth verification middleware - FIXED: use verify-forward endpoint
     auth-verify:
       forwardAuth:
         address: "http://auth_service:8000/api/verify-forward"
@@ -11,20 +9,7 @@ http:
           - "X-User-ID"
         trustForwardHeader: true
     
-    # Rate limiting middleware
-    rate-limit:
-      rateLimit:
-        average: 100
-        burst: 50
-        period: 1m
-    
-    # Strip prefix middlewares (already defined in docker labels, but can be here too)
-    auth-strip:
-      stripPrefix:
-        prefixes:
-          - "/auth"
-    
-    # CORS headers middleware
+    # CORS headers
     cors-headers:
       headers:
         accessControlAllowMethods:
@@ -35,19 +20,26 @@ http:
           - "PATCH"
           - "OPTIONS"
         accessControlAllowOriginList:
-          - "*"
+          - "http://localhost:3000"
+          - "http://localhost"
         accessControlAllowHeaders:
           - "Content-Type"
           - "Authorization"
-          - "X-Requested-With"
+        accessControlAllowCredentials: true
         accessControlMaxAge: 100
-        addVaryHeader: true
     
     # Security headers
     security-headers:
       headers:
         frameDeny: true
-        contentTypeNosniff: true
         browserXssFilter: true
+        contentTypeNosniff: true
         stsSeconds: 31536000
         stsIncludeSubdomains: true
+    
+    # Rate limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m

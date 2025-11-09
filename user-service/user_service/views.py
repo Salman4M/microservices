@@ -1,6 +1,7 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view  
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -9,7 +10,6 @@ from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
 from Core.authentication import GatewayHeaderAuthentication
 from Core.messaging import publisher
-from rest_framework.views import APIView
 
 from .serializers import (
     UserSerializer, 
@@ -38,26 +38,13 @@ class RegisterView(generics.CreateAPIView):
                 is_active=user.is_active
             )
         return Response({
+            "uuid": str(user.id),
+            "email": user.email,
             "user": UserSerializer(user, context=self.get_serializer_context()).data
         }, status=status.HTTP_201_CREATED)
 
 
-#  Login 
-
-# class LoginView(APIView):
-#     serializer_class = LoginSerializer
-
-#     def post(self, request):
-#         serializer = self.serializer_class(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         user = serializer.validated_data['user']
-#         return Response({
-#             "uuid": str(user.id),
-#             "email": user.email
-#         }, status=status.HTTP_200_OK)
-
-
-
+#  Internal Credential Validation (called by Auth Service)
 @api_view(['POST'])
 def validate_credentials(request):
     """
@@ -74,9 +61,6 @@ def validate_credentials(request):
         )
     
     try:
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        
         user = User.objects.get(email=email)
         
         if not user.check_password(password):
@@ -109,11 +93,10 @@ def validate_credentials(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
 #  Logout 
 class LogoutView(APIView):
-
     def post(self, request):
-        # JWT blacklisting artıq servisdə yoxdursa, sadəcə cavab qaytara bilərsən
         return Response({"detail": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
 
 
@@ -181,7 +164,6 @@ Maestro komandası
 
 # Password Reset Confirm
 class PasswordResetConfirmView(APIView):
-
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

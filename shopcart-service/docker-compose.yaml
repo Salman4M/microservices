@@ -47,7 +47,7 @@ services:
       - "traefik.http.routers.shopcart-api.rule=PathPrefix(`/shopcart/api`)"
       - "traefik.http.routers.shopcart-api.entrypoints=web"
       - "traefik.http.services.shopcart-api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.shopcart-api.middlewares=auth-verify"
+      - "traefik.http.routers.shopcart-api.middlewares=auth-verify@file"
 
 
   db:

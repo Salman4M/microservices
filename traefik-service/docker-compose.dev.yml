@@ -1,3 +1,4 @@
+#docker-compose.dev.yml
 services:
   traefik:
     image: traefik:v2.10
@@ -75,8 +76,6 @@ services:
     networks:
       - shared_network
       - monitoring
-    depends_on:
-      - redis_service
     labels:
       - "traefik.enable=true"
       # Route /auth/* to this service
@@ -97,21 +96,6 @@ services:
       timeout: 3s
       retries: 3
 
-  # Redis for Auth Service
-  redis_service:
-    image: redis:7.2-alpine
-    container_name: redis_service
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    networks:
-      - shared_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
 
   # Prometheus for metrics
   prometheus:
@@ -163,6 +147,5 @@ networks:
     driver: bridge
 
 volumes:
-  redis_data:
   prometheus-data:
   grafana-data:
