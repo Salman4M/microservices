@@ -1,3 +1,4 @@
+# user-service/Core/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
@@ -5,7 +6,7 @@ from rest_framework.renderers import JSONRenderer
 
 urlpatterns = [
     path('user-admin/', admin.site.urls),
-    path('', include('user_service.urls')),  # Remove 'api/' prefix here
+    path('api/', include('user_service.urls')),  # Add api/ prefix here since user_service urls don't have it
 ]
 
 urlpatterns += (

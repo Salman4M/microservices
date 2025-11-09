@@ -130,7 +130,7 @@ async def authenticate_user(email: str, password: str) -> Optional[dict]:
         # Call the internal validation endpoint (not routed through Traefik)
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f'{USER_SERVICE_URL}/api/user/internal/validate-credentials/',
+                f'{USER_SERVICE_URL}/api/internal/validate-credentials/',
                 json={'email': email, 'password': password},
                 timeout=10.0
             )
