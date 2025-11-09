@@ -1,0 +1,97 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'development'
+    cluster: 'local'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load rules once and periodically evaluate them
+rule_files:
+  # - "rules/*.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  # Auth Service
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8000']
+    metrics_path: '/metrics'
+
+  # Gateway Service
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway_service:8080']
+    metrics_path: '/metrics'
+
+  # User Service (Django)
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['web:8000']
+    metrics_path: '/metrics'
+
+  # Shop Service (Django)
+  - job_name: 'shop-service'
+    static_configs:
+      - targets: ['shop-service-web-1:8000']
+    metrics_path: '/metrics'
+
+  # Product Service (FastAPI)
+  - job_name: 'product-service'
+    static_configs:
+      - targets: ['product-service-web-1:8000']
+    metrics_path: '/metrics'
+
+  # Order Service (Django)
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8000']
+    metrics_path: '/metrics'
+
+  # ShopCart Service (FastAPI)
+  - job_name: 'shopcart-service'
+    static_configs:
+      - targets: ['shopcart_service:8000']
+    metrics_path: '/metrics'
+
+  # RabbitMQ (if metrics plugin enabled)
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    metrics_path: '/metrics'
+
+  # Redis (if redis_exporter is used)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # PostgreSQL (if postgres_exporter is used)
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Docker container metrics (if cAdvisor is used)
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+
+  # Node Exporter for host metrics (optional)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']

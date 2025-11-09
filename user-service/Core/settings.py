@@ -140,14 +140,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'user_service.User' # Custom user model
 
 
-# Django Rest Framework and JWT settings
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'Core.authentication.GatewayHeaderAuthentication',
+        # Change from GatewayHeaderAuthentication to TraefikHeaderAuthentication
+        'user_service.authentication.TraefikHeaderAuthentication',
     ),
-    
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+
+# # Django Rest Framework and JWT settings
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'Core.authentication.GatewayHeaderAuthentication',
+#     ),
+    
+#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+# }
 
 from datetime import timedelta
 

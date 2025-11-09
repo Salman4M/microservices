@@ -56,18 +56,18 @@ services:
       - shared_network
 
     labels:
-      #  Enable Traefik routing only for admin panel
       - "traefik.enable=true"
       
-      # Route only /admin/* to this service
+      # API routes (protected)
+      - "traefik.http.routers.user-api.rule=PathPrefix(`/user/api`)"
+      - "traefik.http.routers.user-api.entrypoints=web"
+      - "traefik.http.services.user-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.user-api.middlewares=auth-verify"
+      
+      # Admin panel (no auth)
       - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
-      
-      # Use same web entrypoint (port 80)
       - "traefik.http.routers.user-admin.entrypoints=web"
-      
-      # Define the internal service port Django runs on
       - "traefik.http.services.user-admin.loadbalancer.server.port=8000"
-
   shop_consumer:
     build: .
     container_name: user_shop_consumer

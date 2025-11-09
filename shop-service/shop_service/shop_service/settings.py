@@ -169,13 +169,28 @@ MEDIA_ROOT = BASE_DIR / 'shop_service/media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# RestFramework settings
+
+# ============================================
+# Update Django Settings
+# ============================================
+# File: shop-service/shop_service/settings.py
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'shop_service.authentication.GatewayHeaderAuthentication',
+        # Change from GatewayHeaderAuthentication to TraefikHeaderAuthentication
+        'shop_service.authentication.TraefikHeaderAuthentication',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+
+# # RestFramework settings
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'shop_service.authentication.GatewayHeaderAuthentication',
+#     ),
+#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+# }
 
 # Swagger settings
 SPECTACULAR_SETTINGS = {

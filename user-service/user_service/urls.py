@@ -4,11 +4,13 @@ from .views import (
     LoginView, LogoutView, 
     UserProfileView,
     PasswordResetRequestView,
-    PasswordResetConfirmView
+    PasswordResetConfirmView,
+    validate_credentials,
 )
 urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
-    path('login/', LoginView.as_view(), name='login'),
+    # path('login/', LoginView.as_view(), name='login'),
+    path('internal/validate-credentials/', validate_credentials),  
     path('logout/', LogoutView.as_view(), name='logout'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),

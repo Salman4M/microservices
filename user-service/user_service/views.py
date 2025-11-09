@@ -9,6 +9,7 @@ from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
 from Core.authentication import GatewayHeaderAuthentication
 from Core.messaging import publisher
+from rest_framework.views import APIView
 
 from .serializers import (
     UserSerializer, 
@@ -43,19 +44,70 @@ class RegisterView(generics.CreateAPIView):
 
 #  Login 
 
-class LoginView(APIView):
-    serializer_class = LoginSerializer
+# class LoginView(APIView):
+#     serializer_class = LoginSerializer
 
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data['user']
+#     def post(self, request):
+#         serializer = self.serializer_class(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         user = serializer.validated_data['user']
+#         return Response({
+#             "uuid": str(user.id),
+#             "email": user.email
+#         }, status=status.HTTP_200_OK)
+
+
+
+@api_view(['POST'])
+def validate_credentials(request):
+    """
+    Internal endpoint called by Auth Service to validate user credentials.
+    NOT exposed via API Gateway - only accessible within internal network.
+    """
+    email = request.data.get('email')
+    password = request.data.get('password')
+    
+    if not email or not password:
+        return Response(
+            {'error': 'Email and password required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        user = User.objects.get(email=email)
+        
+        if not user.check_password(password):
+            return Response(
+                {'error': 'Invalid credentials'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        if not user.is_active:
+            return Response(
+                {'error': 'User account is disabled'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
         return Response({
-            "uuid": str(user.id),
-            "email": user.email
+            'uuid': str(user.id),
+            'email': user.email,
+            'is_active': user.is_active,
+            'is_shop_owner': user.is_shop_owner
         }, status=status.HTTP_200_OK)
-
-
+        
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'Invalid credentials'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    except Exception as e:
+        return Response(
+            {'error': 'Authentication service error'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 #  Logout 
 class LogoutView(APIView):

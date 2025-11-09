@@ -40,6 +40,16 @@ services:
       - internal_net
       - shared_network
 
+    labels:
+      - "traefik.enable=true"
+      
+      # API routes (protected)
+      - "traefik.http.routers.shopcart-api.rule=PathPrefix(`/shopcart/api`)"
+      - "traefik.http.routers.shopcart-api.entrypoints=web"
+      - "traefik.http.services.shopcart-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.shopcart-api.middlewares=auth-verify"
+
+
   db:
     image: postgres:16-alpine
     container_name: postgres_db

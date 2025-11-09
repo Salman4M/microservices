@@ -167,13 +167,23 @@ MEDIA_ROOT = BASE_DIR / 'order_service/media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# RestFramework settings
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'order_service.authentication.GatewayHeaderAuthentication',
+        # Change from GatewayHeaderAuthentication to TraefikHeaderAuthentication
+        'order_service.authentication.TraefikHeaderAuthentication',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
+
+# # RestFramework settings
+# REST_FRAMEWORK = {
+#     'DEFAULT_AUTHENTICATION_CLASSES': (
+#         'order_service.authentication.GatewayHeaderAuthentication',
+#     ),
+#     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+# }
 
 
 # Swagger settings

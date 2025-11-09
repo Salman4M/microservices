@@ -15,7 +15,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import * 
 from ..serializers import *
 from utils.pagination import CustomPagination
-from shop_service.authentication import GatewayHeaderAuthentication
+from shop_service.authentication import TraefikHeaderAuthentication
 from shop_service.messaging import publisher
 
 logger = logging.getLogger('shop_service')
@@ -113,7 +113,7 @@ class ShopCreateAPIView(APIView):
     """Create a new shop. Only authenticated users can create."""
     http_method_names = ['post']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='shop_create',
@@ -147,7 +147,7 @@ class ShopManagementAPIView(APIView):
     """Update or soft-delete a shop. Only the owner can modify or delete."""
     http_method_names = ['patch', 'delete']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='shop_update',
@@ -283,7 +283,7 @@ class CreateShopBranchAPIView(APIView):
     """Allows an authenticated user to create a new shop branch."""
     http_method_names =['post']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='branch_create',
@@ -324,7 +324,7 @@ class ShopBranchManagementAPIView(APIView):
     """Allows the owner to update or soft-delete their shop branch."""
     http_method_names = ['patch', 'delete']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='branch_update',
@@ -409,7 +409,7 @@ class CommentListByShopAPIView(APIView):
 class CreateShopCommentAPIView(APIView):
     """Create a shop comment."""
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='comment_create',
@@ -443,7 +443,7 @@ class CommentManagementAPIView(APIView):
     """Update or delete a comment."""
     http_method_names = ['delete', 'patch']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='comment_update',
@@ -530,7 +530,7 @@ class ShopMediaByShopAPIView(APIView):
 class CreateShopMediaAPIView(APIView):
     """Allows an authenticated user to create a new shop media."""
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='media_create',
@@ -571,7 +571,7 @@ class DeleteShopMediaAPIView(APIView):
     """Allows the owner to delete their shop media."""
     http_method_names = ['delete']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
     
     @extend_schema(
         operation_id='media_delete',
@@ -648,7 +648,7 @@ class CreateShopSocialMediaAPIView(APIView):
     """Allows an authenticated user to create a new shop social media."""
     http_method_names = ['post']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='social_media_create',
@@ -689,7 +689,7 @@ class ShopSocialMediaManagementAPIView(APIView):
     """Allows the owner to update or delete their shop social media."""
     http_method_names = ['patch', 'delete']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='social_media_update',
@@ -754,7 +754,7 @@ class ShopStatusManagementAPIView(APIView):
     """
     http_method_names = ['patch']
     permission_classes = [IsAuthenticated]
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
 
     @extend_schema(
         operation_id='shop_status_update',
@@ -805,7 +805,7 @@ class ShopStatusManagementAPIView(APIView):
         logger.info(f"PATCH /shops/{shop_slug}/status/ - Status update request from user {user.id}")
         
         # Check if user is admin/staff
-        # Note: Since we're using GatewayHeaderAuthentication with a simple user object,
+        # Note: Since we're using TraefikHeaderAuthentication with a simple user object,
         # you might need to check this differently. For now, checking is_superuser equivalent
         # You may need to adjust this based on your authentication setup
         

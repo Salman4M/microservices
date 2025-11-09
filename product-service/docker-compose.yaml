@@ -21,12 +21,12 @@ services:
 
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.product.rule=PathPrefix(`/product`)"
-      - "traefik.http.routers.product.entrypoints=web"
-      - "traefik.http.services.product.loadbalancer.server.port=8000"
-      - "traefik.http.routers.product.middlewares=product-strip,cors-headers,security-headers"
-      - "traefik.http.middlewares.product-strip.stripprefix.prefixes=/product"
-
+      
+      # API routes (protected)
+      - "traefik.http.routers.product-api.rule=PathPrefix(`/product/api`)"
+      - "traefik.http.routers.product-api.entrypoints=web"
+      - "traefik.http.services.product-api.loadbalancer.server.port=8000"
+      - "traefik.http.routers.product-api.middlewares=auth-verify"
   db:
     image: postgres:15
     container_name: product_postgres_db

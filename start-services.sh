@@ -3,11 +3,11 @@
 # Create shared network if not exists
 docker network create shared_network 2>/dev/null || true
 
-# Start Traefik first
-echo "Starting Traefik..."
-cd traefik-service
-docker-compose up -d
-cd ..
+# # Start Traefik first
+# echo "Starting Traefik..."
+# cd traefik-service
+# docker-compose up -d
+# cd ..
 
 # Wait for Traefik to be ready
 echo "Waiting for Traefik to start..."
@@ -24,11 +24,11 @@ cd rabbitmq-service
 docker-compose up -d
 cd ..
 
-# Start Gateway
-echo "Starting Gateway Service..."
-cd gateway-service
-docker-compose up -d
-cd ..
+# # Start Gateway
+# echo "Starting Gateway Service..."
+# cd gateway-service
+# docker-compose up -d
+# cd ..
 
 # Start backend services
 echo "Starting User Service..."

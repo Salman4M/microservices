@@ -1,45 +1,53 @@
+# Dynamic configuration for Traefik middleware
+# This file is mounted into Traefik container
+
 http:
   middlewares:
-    # CORS for all services
-    cors-headers:
-      headers:
-        accessControlAllowMethods:
-          - GET
-          - POST
-          - PUT
-          - PATCH
-          - DELETE
-          - OPTIONS
-        accessControlAllowOriginList:
-          - "*"
-        accessControlAllowHeaders:
-          - "*"
-        accessControlExposeHeaders:
-          - "*"
-        accessControlAllowCredentials: true
-        accessControlMaxAge: 3600
-    
-    # Security headers
-    security-headers:
-      headers:
-        frameDeny: true
-        browserXssFilter: true
-        contentTypeNosniff: true
-        customResponseHeaders:
-          X-Robots-Tag: "noindex,nofollow"
-    
-    # JWT Authentication (points to auth service)
-    auth-jwt:
+    # ForwardAuth middleware - sends requests to Auth Service for verification
+    auth-verify:
       forwardAuth:
-        address: "http://auth-service:8000/verify"
+        address: "http://auth_service:8000/api/verify-forward"
         authResponseHeaders:
           - "X-User-ID"
-          - "X-User-Email"
         trustForwardHeader: true
     
-    # Rate limiting
+    # Rate limiting middleware
     rate-limit:
       rateLimit:
         average: 100
         burst: 50
         period: 1m
+    
+    # Strip prefix middlewares (already defined in docker labels, but can be here too)
+    auth-strip:
+      stripPrefix:
+        prefixes:
+          - "/auth"
+    
+    # CORS headers middleware
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "DELETE"
+          - "PATCH"
+          - "OPTIONS"
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+    
+    # Security headers
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true

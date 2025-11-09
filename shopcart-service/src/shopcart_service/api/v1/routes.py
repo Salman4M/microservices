@@ -10,20 +10,43 @@ from src.shopcart_service.core.product_client import product_client
 from uuid import UUID
 from ...core.product_client import ProductServiceDataCheck
 product_client = ProductServiceDataCheck()
-
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/shopcart/api", tags=["Cart"])
 
-def get_user_id(user_id: str = Header(None, alias="X-User-Id", include_in_schema=False)):
-    """Extract user ID from X-User-Id header"""
-    if not user_id:
+
+async def get_user_id(x_user_id: Optional[str] = Header(None)):
+    """
+    Dependency to extract user ID from X-User-ID header.
+    Used in FastAPI services.
+    """
+    if not x_user_id:
         raise HTTPException(
-            status_code=401, 
-            detail="User ID not found in request headers"
+            status_code=401,
+            detail="Authentication required"
         )
-    return user_id
+    
+    try:
+        # Validate UUID
+        from uuid import UUID
+        UUID(x_user_id)
+        return x_user_id
+    except ValueError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid user ID format"
+        )
+
+# def get_user_id(user_id: str = Header(None, alias="X-User-Id", include_in_schema=False)):
+#     """Extract user ID from X-User-Id header"""
+#     if not user_id:
+#         raise HTTPException(
+#             status_code=401, 
+#             detail="User ID not found in request headers"
+#         )
+#     return user_id
 
 
 # def verify_cart_ownership(db: Session, cart_id: int, user_uuid: str):
