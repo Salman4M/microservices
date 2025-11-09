@@ -140,14 +140,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'user_service.User' # Custom user model
 
 
-
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        # Change from GatewayHeaderAuthentication to TraefikHeaderAuthentication
-        'user_service.authentication.TraefikHeaderAuthentication',
+        'Core.authentication.TraefikHeaderAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
 
 
 # # Django Rest Framework and JWT settings

@@ -13,3 +13,13 @@ app.include_router(router, prefix="/api")
 @app.get("/")
 def read_root():
     return {"message": "Product Service is running 🚀"}
+
+# Add this metrics endpoint
+@app.get("/metrics")
+def metrics():
+    """Basic metrics endpoint for Prometheus"""
+    return {
+        "service": "product-service",
+        "status": "healthy",
+        "uptime": "running"
+    }

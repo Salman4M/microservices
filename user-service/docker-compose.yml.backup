@@ -50,30 +50,24 @@ services:
     labels:
       - "traefik.enable=true"
       
-      # Define service once
-      - "traefik.http.services.user-api.loadbalancer.server.port=8000"
-      
-      # Define StripPrefix middleware to remove /user prefix
-      - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user/api,/user"
-      
       # PRIORITY 3: Public routes (NO AUTH - register, internal validation)
-      - "traefik.http.routers.user-public.rule=PathPrefix(`/user/api/register`) || PathPrefix(`/user/internal`)"
+      - "traefik.http.routers.user-public.rule=PathPrefix(`/user/api/register`) || PathPrefix(`/user/api/internal`)"
       - "traefik.http.routers.user-public.entrypoints=web"
       - "traefik.http.routers.user-public.service=user-api"
-      - "traefik.http.routers.user-public.middlewares=user-strip"
+      - "traefik.http.services.user-api.loadbalancer.server.port=8000"
       - "traefik.http.routers.user-public.priority=3"
       
-      # PRIORITY 2: Admin panel (NO AUTH)
-      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
-      - "traefik.http.routers.user-admin.entrypoints=web"
-      - "traefik.http.routers.user-admin.service=user-api"
-      - "traefik.http.routers.user-admin.priority=2"
+      # PRIORITY 2: Docs/Admin routes (NO AUTH)
+      - "traefik.http.routers.user-docs.rule=PathPrefix(`/user/docs`) || PathPrefix(`/user/admin`) || PathPrefix(`/user/openapi.json`) || PathPrefix(`/user-admin`)"
+      - "traefik.http.routers.user-docs.entrypoints=web"
+      - "traefik.http.routers.user-docs.service=user-api"
+      - "traefik.http.routers.user-docs.priority=2"
       
       # PRIORITY 1: Protected routes (WITH AUTH - profile, etc.)
       - "traefik.http.routers.user-protected.rule=PathPrefix(`/user/api`)"
       - "traefik.http.routers.user-protected.entrypoints=web"
       - "traefik.http.routers.user-protected.service=user-api"
-      - "traefik.http.routers.user-protected.middlewares=user-strip,auth-verify@file"
+      - "traefik.http.routers.user-protected.middlewares=auth-verify@file"
       - "traefik.http.routers.user-protected.priority=1"
 
   shop_consumer:

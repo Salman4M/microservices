@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     RegisterView, 
-    LoginView, LogoutView, 
+    LogoutView, 
     UserProfileView,
     PasswordResetRequestView,
     PasswordResetConfirmView,

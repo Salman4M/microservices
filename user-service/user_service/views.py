@@ -8,8 +8,9 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth import get_user_model
-from Core.authentication import GatewayHeaderAuthentication
+from Core.authentication import TraefikHeaderAuthentication
 from Core.messaging import publisher
+from rest_framework.permissions import AllowAny
 
 from .serializers import (
     UserSerializer, 
@@ -26,6 +27,9 @@ token_generator = PasswordResetTokenGenerator()
 #  Register 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]  # added
+
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -102,7 +106,7 @@ class LogoutView(APIView):
 
 # User Profile
 class UserProfileView(APIView):
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -126,7 +130,7 @@ class UserProfileView(APIView):
 
 # Password Reset Request
 class PasswordResetRequestView(APIView):
-    authentication_classes = [GatewayHeaderAuthentication]
+    authentication_classes = [TraefikHeaderAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
