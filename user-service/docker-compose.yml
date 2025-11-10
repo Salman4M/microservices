@@ -68,7 +68,7 @@ services:
       - "traefik.http.routers.user-internal.entrypoints=web"
       - "traefik.http.routers.user-internal.service=user-api"
       - "traefik.http.routers.user-internal.middlewares=user-strip"
-      - "traefik.http.routers.user-internal.priority=2"
+      - "traefik.http.routers.user-internal.priority=10"
       
       # PRIORITY 1: Protected routes (WITH AUTH - lowest priority)
       - "traefik.http.routers.user-protected.rule=PathPrefix(`/user/api`)"

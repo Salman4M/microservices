@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from Core.authentication import TraefikHeaderAuthentication
 from Core.messaging import publisher
 from rest_framework.permissions import AllowAny
-
+import logging
 from .serializers import (
     UserSerializer, 
     RegisterSerializer,
@@ -19,6 +19,9 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer
 )
+
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 token_generator = PasswordResetTokenGenerator()
@@ -51,14 +54,14 @@ class RegisterView(generics.CreateAPIView):
 #  Internal Credential Validation (called by Auth Service)
 @api_view(['POST'])
 def validate_credentials(request):
-    """
-    Internal endpoint called by Auth Service to validate user credentials.
-    NOT exposed via API Gateway - only accessible within internal network.
-    """
+    """Internal endpoint for credential validation"""
     email = request.data.get('email')
     password = request.data.get('password')
     
+    logger.info(f"Credential validation request for: {email}")  # ✅ ADD THIS
+    
     if not email or not password:
+        logger.warning("Missing email or password")  # ✅ ADD THIS
         return Response(
             {'error': 'Email and password required'}, 
             status=status.HTTP_400_BAD_REQUEST
@@ -66,19 +69,23 @@ def validate_credentials(request):
     
     try:
         user = User.objects.get(email=email)
+        logger.info(f"User found: {email}")  # ✅ ADD THIS
         
         if not user.check_password(password):
+            logger.warning(f"Invalid password for: {email}")  # ✅ ADD THIS
             return Response(
                 {'error': 'Invalid credentials'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
         if not user.is_active:
+            logger.warning(f"Inactive user: {email}")  # ✅ ADD THIS
             return Response(
                 {'error': 'User account is disabled'}, 
                 status=status.HTTP_401_UNAUTHORIZED
             )
         
+        logger.info(f"Credentials valid for: {email}")  # ✅ ADD THIS
         return Response({
             'uuid': str(user.id),
             'email': user.email,
@@ -87,16 +94,17 @@ def validate_credentials(request):
         }, status=status.HTTP_200_OK)
         
     except User.DoesNotExist:
+        logger.warning(f"User not found: {email}")  # ✅ ADD THIS
         return Response(
             {'error': 'Invalid credentials'}, 
             status=status.HTTP_401_UNAUTHORIZED
         )
     except Exception as e:
+        logger.error(f"Database error: {e}", exc_info=True)  # ✅ ADD THIS
         return Response(
             {'error': 'Authentication service error'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 #  Logout 
 class LogoutView(APIView):
