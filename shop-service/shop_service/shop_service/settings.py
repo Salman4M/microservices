@@ -26,8 +26,6 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "shop-service-814454543179.europe-west1.run.app",
     "shop-service-web-1",
-    'web',
-    'web:8000',
 ]
 
 CSRF_TRUSTED_ORIGINS = [

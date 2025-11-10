@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import redis
 from redis.connection import ConnectionPool
 import logging
-
+import asyncio
 load_dotenv()
 
 # Logging setup
@@ -157,48 +157,63 @@ def verify_token(token: str) -> dict:
 
 # ✅ FIXED: Better error handling and logging
 async def authenticate_user(email: str, password: str) -> Optional[dict]:
-    """Authenticate user via User Service internal endpoint"""
-    try:
-        logger.info(f"Attempting authentication for: {email}")
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f'{USER_SERVICE_URL}/api/internal/validate-credentials/',
-                json={'email': email, 'password': password}
-            )
-        
-        logger.info(f"User service response status: {response.status_code}")
-        
-        if response.status_code == 200:
-            user_data = response.json()
-            logger.info(f"Authentication successful for: {email}")
-            return user_data
-        elif response.status_code == 401:
-            logger.warning(f"Invalid credentials for: {email}")
-            return None
-        else:
-            logger.error(f"Unexpected status {response.status_code} for {email}: {response.text}")
-            return None
+    """Authenticate user via User Service internal endpoint with retry"""
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Authentication attempt {attempt + 1} for: {email}")
             
-    except httpx.ConnectError as e:
-        logger.error(f"Cannot connect to User Service at {USER_SERVICE_URL}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="User service is unavailable"
-        )
-    except httpx.TimeoutException as e:
-        logger.error(f"Timeout connecting to User Service: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="User service timeout"
-        )
-    except Exception as e:
-        logger.error(f"User service communication error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service temporarily unavailable"
-        )
-
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f'{USER_SERVICE_URL}/api/internal/validate-credentials/',
+                    json={'email': email, 'password': password}
+                )
+            
+            logger.info(f"User service response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                user_data = response.json()
+                logger.info(f"Authentication successful for: {email}")
+                return user_data
+            elif response.status_code == 401:
+                logger.warning(f"Invalid credentials for: {email}")
+                return None
+            else:
+                logger.error(f"Unexpected status {response.status_code}")
+                # Retry on server errors
+                if attempt < max_retries - 1 and response.status_code >= 500:
+                    await asyncio.sleep(retry_delay)
+                    continue
+                return None
+                
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                continue
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="User service is unavailable"
+            )
+        except httpx.TimeoutException as e:
+            logger.error(f"Timeout (attempt {attempt + 1}): {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+                continue
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="User service timeout"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service error"
+            )
+    
+    return None
 
 @app.get("/")
 def root():

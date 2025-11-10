@@ -82,6 +82,13 @@ services:
       - "traefik.http.routers.user-admin.entrypoints=web"
       - "traefik.http.routers.user-admin.service=user-api"
 
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   shop_consumer:
     build: .
     container_name: user_shop_consumer
