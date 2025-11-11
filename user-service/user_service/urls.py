@@ -7,11 +7,13 @@ from .views import (
     PasswordResetRequestView,
     PasswordResetConfirmView,
     validate_credentials,
+    health_check,
 )
 
 urlpatterns = [
+    path('health/', health_check, name='health'),  # Health check endpoint
     path('register/', RegisterView.as_view(), name='register'),
-    path('internal/validate-credentials/', validate_credentials),  
+    path('internal/validate-credentials/', validate_credentials, name='validate_credentials'),  
     path('logout/', LogoutView.as_view(), name='logout'),
     path('profile/', UserProfileView.as_view(), name='user-profile'),
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),

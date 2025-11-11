@@ -26,6 +26,8 @@ services:
     restart: on-failure
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}
@@ -49,38 +51,31 @@ services:
 
     labels:
       - "traefik.enable=true"
+      - "traefik.http.services.user-service.loadbalancer.server.port=8000"
       
-      # Define service once
-      - "traefik.http.services.user-api.loadbalancer.server.port=8000"
-      
-      # Middleware to strip /user prefix
+      # Create middleware to strip /user prefix
       - "traefik.http.middlewares.user-strip.stripprefix.prefixes=/user"
       
-      # PRIORITY 3: Registration (NO AUTH - highest priority for /register)
-      - "traefik.http.routers.user-register.rule=PathPrefix(`/user/api/register`)"
-      - "traefik.http.routers.user-register.entrypoints=web"
-      - "traefik.http.routers.user-register.service=user-api"
-      - "traefik.http.routers.user-register.middlewares=user-strip"
-      - "traefik.http.routers.user-register.priority=3"
+      # Route 1: All /user/api requests (strips /user, passes /api to Django)
+      - "traefik.http.routers.user-api.rule=Host(`localhost`) && PathPrefix(`/user/api`)"
+      - "traefik.http.routers.user-api.entrypoints=web"
+      - "traefik.http.routers.user-api.service=user-service"
+      - "traefik.http.routers.user-api.middlewares=user-strip"
+      - "traefik.http.routers.user-api.priority=20"
       
-      # PRIORITY 2: Internal validation (NO AUTH)
-      - "traefik.http.routers.user-internal.rule=PathPrefix(`/user/api/internal`)"
-      - "traefik.http.routers.user-internal.entrypoints=web"
-      - "traefik.http.routers.user-internal.service=user-api"
-      - "traefik.http.routers.user-internal.middlewares=user-strip"
-      - "traefik.http.routers.user-internal.priority=10"
-      
-      # PRIORITY 1: Protected routes (WITH AUTH - lowest priority)
-      - "traefik.http.routers.user-protected.rule=PathPrefix(`/user/api`)"
-      - "traefik.http.routers.user-protected.entrypoints=web"
-      - "traefik.http.routers.user-protected.service=user-api"
-      - "traefik.http.routers.user-protected.middlewares=user-strip,auth-verify@file"
-      - "traefik.http.routers.user-protected.priority=1"
-      
-      # Admin panel (NO AUTH)
-      - "traefik.http.routers.user-admin.rule=PathPrefix(`/user-admin`)"
+      # Route 2: Admin panel at /user/user-admin
+      - "traefik.http.routers.user-admin.rule=Host(`localhost`) && PathPrefix(`/user/user-admin`)"
       - "traefik.http.routers.user-admin.entrypoints=web"
-      - "traefik.http.routers.user-admin.service=user-api"
+      - "traefik.http.routers.user-admin.service=user-service"
+      - "traefik.http.routers.user-admin.middlewares=user-strip"
+      - "traefik.http.routers.user-admin.priority=15"
+      
+      # Route 3: OpenAPI docs at /user/openapi.json, /user/api/schema
+      - "traefik.http.routers.user-docs.rule=Host(`localhost`) && (PathPrefix(`/user/openapi.json`) || PathPrefix(`/user/api/schema`))"
+      - "traefik.http.routers.user-docs.entrypoints=web"
+      - "traefik.http.routers.user-docs.service=user-service"
+      - "traefik.http.routers.user-docs.middlewares=user-strip"
+      - "traefik.http.routers.user-docs.priority=25"
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]

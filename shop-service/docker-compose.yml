@@ -67,7 +67,7 @@ services:
       - "traefik.http.services.shop-admin.loadbalancer.server.port=8000"
       
 
-volumes:
+volumes:  
   pgdata:
   media:
   staticfiles:

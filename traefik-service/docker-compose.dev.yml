@@ -78,24 +78,39 @@ services:
       - monitoring
     labels:
       - "traefik.enable=true"
-      # Route /auth/* to this service
-      - "traefik.http.routers.auth.rule=PathPrefix(`/auth`)"
-      - "traefik.http.routers.auth.entrypoints=web"
+      
+      # Define service once
       - "traefik.http.services.auth.loadbalancer.server.port=8000"
-      # Strip /auth prefix before forwarding
-      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/auth"
-      - "traefik.http.routers.auth.middlewares=auth-strip"
-        # Docs routes (no auth needed)
-      - "traefik.http.routers.auth-docs.rule=PathPrefix(`/auth/docs`) || PathPrefix(`/auth/openapi.json`)"
+      
+      # PRIORITY 3: Docs and OpenAPI (NO AUTH, NO STRIP)
+      - "traefik.http.routers.auth-docs.rule=Host(`localhost`) && (PathPrefix(`/auth/docs`) || PathPrefix(`/auth/redoc`) || PathPrefix(`/auth/openapi.json`))"
       - "traefik.http.routers.auth-docs.entrypoints=web"
       - "traefik.http.routers.auth-docs.service=auth"
+      - "traefik.http.routers.auth-docs.priority=3"
+      # Strip /auth for docs
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/auth"
       - "traefik.http.routers.auth-docs.middlewares=auth-strip"
+      
+      # PRIORITY 2: API routes (with strip)
+      - "traefik.http.routers.auth-api.rule=Host(`localhost`) && PathPrefix(`/auth/api`)"
+      - "traefik.http.routers.auth-api.entrypoints=web"
+      - "traefik.http.routers.auth-api.service=auth"
+      - "traefik.http.routers.auth-api.middlewares=auth-strip"
+      - "traefik.http.routers.auth-api.priority=2"
+      
+      # PRIORITY 1: Root and health (with strip)
+      - "traefik.http.routers.auth-root.rule=Host(`localhost`) && PathPrefix(`/auth`)"
+      - "traefik.http.routers.auth-root.entrypoints=web"
+      - "traefik.http.routers.auth-root.service=auth"
+      - "traefik.http.routers.auth-root.middlewares=auth-strip"
+      - "traefik.http.routers.auth-root.priority=1"
+      
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 3s
       retries: 3
-
+      start_period: 10s
 
   # Prometheus for metrics
   prometheus:
