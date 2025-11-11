@@ -5,7 +5,7 @@ docker network create shared_network 2>/dev/null || true
 
 # Start Traefik first
 echo "Starting Traefik..."
-cd traefik-service
+cd nginx-service
 docker-compose up -d
 cd ..
 

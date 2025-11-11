@@ -54,18 +54,18 @@ services:
       - internal_net
       - shared_network
 
-    labels:
-      #  Enable Traefik routing only for admin panel
-      - "traefik.enable=true"
+    # labels:
+    #   #  Enable Traefik routing only for admin panel
+    #   - "traefik.enable=true"
       
-      # Route only /admin/* to this service
-      - "traefik.http.routers.order-admin.rule=PathPrefix(`/order-admin`)"
+    #   # Route only /admin/* to this service
+    #   - "traefik.http.routers.order-admin.rule=PathPrefix(`/order-admin`)"
       
-      # Use same web entrypoint (port 80)
-      - "traefik.http.routers.order-admin.entrypoints=web"
+    #   # Use same web entrypoint (port 80)
+    #   - "traefik.http.routers.order-admin.entrypoints=web"
       
-      # Define the internal service port Django runs on
-      - "traefik.http.services.order-admin.loadbalancer.server.port=8000"
+    #   # Define the internal service port Django runs on
+    #   - "traefik.http.services.order-admin.loadbalancer.server.port=8000"
 
 
 volumes:

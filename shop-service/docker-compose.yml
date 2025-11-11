@@ -52,12 +52,12 @@ services:
       - internal_net
       - shared_network
 
-    labels:
-      # Enable Traefik routing only for admin panel
-      - "traefik.enable=true"
-      - "traefik.http.routers.shop-admin.rule=PathPrefix(`/shop-admin`)"
-      - "traefik.http.routers.shop-admin.entrypoints=web"
-      - "traefik.http.services.shop-admin.loadbalancer.server.port=8000"
+    # labels:
+    #   # Enable Traefik routing only for admin panel
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.shop-admin.rule=PathPrefix(`/shop-admin`)"
+    #   - "traefik.http.routers.shop-admin.entrypoints=web"
+    #   - "traefik.http.services.shop-admin.loadbalancer.server.port=8000"
       
 
 volumes:

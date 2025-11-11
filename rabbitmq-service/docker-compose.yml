@@ -17,20 +17,20 @@ services:
     networks:
       - shared_network
 
-    labels:
-      - "traefik.enable=true"
+    # labels:
+    #   - "traefik.enable=true"
       
-      # Path-based: http://localhost/rabbitmq
-      - "traefik.http.routers.rabbitmq-ui.rule=Host(`localhost`) && PathPrefix(`/rabbitmq`)"
-      - "traefik.http.routers.rabbitmq-ui.entrypoints=web"
+    #   # Path-based: http://localhost/rabbitmq
+    #   - "traefik.http.routers.rabbitmq-ui.rule=Host(`localhost`) && PathPrefix(`/rabbitmq`)"
+    #   - "traefik.http.routers.rabbitmq-ui.entrypoints=web"
       
-      # Strip /rabbitmq prefix
-      - "traefik.http.middlewares.rabbitmq-strip.stripprefix.prefixes=/rabbitmq"
-      - "traefik.http.routers.rabbitmq-ui.middlewares=rabbitmq-strip"
+    #   # Strip /rabbitmq prefix
+    #   - "traefik.http.middlewares.rabbitmq-strip.stripprefix.prefixes=/rabbitmq"
+    #   - "traefik.http.routers.rabbitmq-ui.middlewares=rabbitmq-strip"
       
-      # Service port
-      - "traefik.http.services.rabbitmq-ui.loadbalancer.server.port=15672"
-      - "traefik.http.routers.rabbitmq-ui.service=rabbitmq-ui"
+    #   # Service port
+    #   - "traefik.http.services.rabbitmq-ui.loadbalancer.server.port=15672"
+    #   - "traefik.http.routers.rabbitmq-ui.service=rabbitmq-ui"
 
     
 
