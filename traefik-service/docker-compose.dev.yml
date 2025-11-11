@@ -1,4 +1,3 @@
-#docker-compose.dev.yml
 services:
   traefik:
     image: traefik:v2.10
@@ -82,28 +81,29 @@ services:
       # Define service once
       - "traefik.http.services.auth.loadbalancer.server.port=8000"
       
-      # PRIORITY 3: Docs and OpenAPI (NO AUTH, NO STRIP)
+      # Middleware to strip /auth prefix
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/auth"
+      
+      # PRIORITY 30: Docs and OpenAPI (NO AUTH)
       - "traefik.http.routers.auth-docs.rule=Host(`localhost`) && (PathPrefix(`/auth/docs`) || PathPrefix(`/auth/redoc`) || PathPrefix(`/auth/openapi.json`))"
       - "traefik.http.routers.auth-docs.entrypoints=web"
       - "traefik.http.routers.auth-docs.service=auth"
-      - "traefik.http.routers.auth-docs.priority=3"
-      # Strip /auth for docs
-      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/auth"
       - "traefik.http.routers.auth-docs.middlewares=auth-strip"
+      - "traefik.http.routers.auth-docs.priority=30"
       
-      # PRIORITY 2: API routes (with strip)
+      # PRIORITY 20: API routes
       - "traefik.http.routers.auth-api.rule=Host(`localhost`) && PathPrefix(`/auth/api`)"
       - "traefik.http.routers.auth-api.entrypoints=web"
       - "traefik.http.routers.auth-api.service=auth"
       - "traefik.http.routers.auth-api.middlewares=auth-strip"
-      - "traefik.http.routers.auth-api.priority=2"
+      - "traefik.http.routers.auth-api.priority=20"
       
-      # PRIORITY 1: Root and health (with strip)
+      # PRIORITY 10: Root and health
       - "traefik.http.routers.auth-root.rule=Host(`localhost`) && PathPrefix(`/auth`)"
       - "traefik.http.routers.auth-root.entrypoints=web"
       - "traefik.http.routers.auth-root.service=auth"
       - "traefik.http.routers.auth-root.middlewares=auth-strip"
-      - "traefik.http.routers.auth-root.priority=1"
+      - "traefik.http.routers.auth-root.priority=10"
       
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

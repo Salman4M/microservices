@@ -12,9 +12,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    #disabled for traefik
-    # ports:
-    #   - "5440:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -45,9 +42,6 @@ services:
       - media:/app/shop_service/media
       - staticfiles:/app/staticfiles
       
-    #disabled for traefik
-    # ports:
-    #   - "${WEB_PORT:-8007}:8000"
     networks:
       - internal_net
       - shared_network
@@ -55,17 +49,32 @@ services:
     labels:
       - "traefik.enable=true"
       
-      # API routes (protected)
-      - "traefik.http.routers.shop-api.rule=PathPrefix(`/shop/api`)"
-      - "traefik.http.routers.shop-api.entrypoints=web"
-      - "traefik.http.services.shop-api.loadbalancer.server.port=8000"
-      - "traefik.http.routers.shop-api.middlewares=auth-verify"
+      # Define service
+      - "traefik.http.services.shop-service.loadbalancer.server.port=8000"
       
-      # Admin panel (no auth)
-      - "traefik.http.routers.shop-admin.rule=PathPrefix(`/shop-admin`)"
+      # Middleware to strip /shop prefix
+      - "traefik.http.middlewares.shop-strip.stripprefix.prefixes=/shop"
+      
+      # PRIORITY 30: Admin panel (NO AUTH, with strip)
+      - "traefik.http.routers.shop-admin.rule=Host(`localhost`) && PathPrefix(`/shop-admin`)"
       - "traefik.http.routers.shop-admin.entrypoints=web"
-      - "traefik.http.services.shop-admin.loadbalancer.server.port=8000"
+      - "traefik.http.routers.shop-admin.service=shop-service"
+      - "traefik.http.routers.shop-admin.middlewares=shop-strip"
+      - "traefik.http.routers.shop-admin.priority=30"
       
+      # PRIORITY 20: Protected API routes (WITH AUTH, with strip)
+      - "traefik.http.routers.shop-api.rule=Host(`localhost`) && PathPrefix(`/shop/api`)"
+      - "traefik.http.routers.shop-api.entrypoints=web"
+      - "traefik.http.routers.shop-api.service=shop-service"
+      - "traefik.http.routers.shop-api.middlewares=shop-strip,auth-verify@file"
+      - "traefik.http.routers.shop-api.priority=20"
+      
+      # PRIORITY 10: OpenAPI docs (NO AUTH, with strip)
+      - "traefik.http.routers.shop-docs.rule=Host(`localhost`) && (PathPrefix(`/shop/openapi.json`) || PathPrefix(`/shop/schema`))"
+      - "traefik.http.routers.shop-docs.entrypoints=web"
+      - "traefik.http.routers.shop-docs.service=shop-service"
+      - "traefik.http.routers.shop-docs.middlewares=shop-strip"
+      - "traefik.http.routers.shop-docs.priority=10"
 
 volumes:  
   pgdata:
@@ -74,9 +83,7 @@ volumes:
 
 networks:
   internal_net:
-  # internal: true
     driver: bridge
   shared_network:
-    # driver: bridge (despite there is a network, it tries to create a new one )
     external: true
     name: shared_network
