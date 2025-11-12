@@ -1,0 +1,120 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'microservices'
+    environment: 'development'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Node Exporter (system metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+        labels:
+          service: 'nginx'
+    metrics_path: '/nginx_status'
+
+  # Auth Service
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8000']
+        labels:
+          service: 'auth'
+          tier: 'application'
+
+  # User Service
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service-web-1:8000']
+        labels:
+          service: 'user'
+          tier: 'application'
+
+  # Shop Service
+  - job_name: 'shop-service'
+    static_configs:
+      - targets: ['shop-service-web-1:8000']
+        labels:
+          service: 'shop'
+          tier: 'application'
+
+  # Product Service
+  - job_name: 'product-service'
+    static_configs:
+      - targets: ['product-service-web-1:8000']
+        labels:
+          service: 'product'
+          tier: 'application'
+
+  # Order Service
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service-web-1:8000']
+        labels:
+          service: 'order'
+          tier: 'application'
+
+  # ShopCart Service
+  - job_name: 'shopcart-service'
+    static_configs:
+      - targets: ['shopcart-service:8000']
+        labels:
+          service: 'shopcart'
+          tier: 'application'
+
+  # Wishlist Service
+  - job_name: 'wishlist-service'
+    static_configs:
+      - targets: ['wishlist-service:8000']
+        labels:
+          service: 'wishlist'
+          tier: 'application'
+
+  # PostgreSQL databases (if postgres_exporter is added)
+  # - job_name: 'postgresql'
+  #   static_configs:
+  #     - targets: 
+  #       - 'user-db:5432'
+  #       - 'shop-db:5432'
+  #       - 'product-db:5432'
+  #       - 'order-db:5432'
+  #       - 'shopcart-db:5432'
+  #       - 'wishlist-db:5432'
+
+  # RabbitMQ (if rabbitmq exporter is enabled)
+  # - job_name: 'rabbitmq'
+  #   static_configs:
+  #     - targets: ['rabbitmq:15692']
+  #       labels:
+  #         service: 'rabbitmq'
+
+  # Redis
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis_service:6379']
+  #       labels:
+  #         service: 'redis'
