@@ -13,17 +13,26 @@ class ProductRepository(BaseRepository[Product]):
     def __init__(self, db_session: Session):
         super().__init__(Product, db_session)
 
-    def create_with_categories(self, obj_in: ProductCreate) -> Product:
+    def create_with_categories(self, obj_in: ProductCreate, shop_id: UUID) -> Product:
         category_ids = obj_in.category_ids or []
         
-        # Remove category_ids from dict
+        # Verify that all categories exist before proceeding
+        if category_ids:
+            existing_categories = self.db_session.query(Category).filter(
+                Category.id.in_(category_ids)
+            ).all()
+            existing_category_ids = {str(cat.id) for cat in existing_categories}
+            missing_categories = set(str(cid) for cid in category_ids) - existing_category_ids
+            
+            if missing_categories:
+                raise ValueError(f"Categories with IDs {missing_categories} do not exist")
+        
+        # Remove category_ids from dict and add shop_id
         clean_data = obj_in.dict(exclude={"category_ids"})
+        clean_data["shop_id"] = shop_id
         
-        # Use ProductBase — it has NO category_ids → SAFE
-        clean_product = ProductBase(**clean_data)
-        
-        # super().create() gets ProductBase → .dict() has no category_ids → SUCCESS
-        db_product = super().create(clean_product)
+        # Create product with all needed data
+        db_product = super().create(clean_data)
         
         for category_id in category_ids:
             pc = ProductCategory(product_id=db_product.id, category_id=category_id)
@@ -34,16 +43,28 @@ class ProductRepository(BaseRepository[Product]):
     def update_with_categories(self, id: UUID, obj_in: ProductCreate) -> Optional[Product]:
         category_ids = obj_in.category_ids or []
         
-        # Get only SET fields from ProductCreate
-        clean_data = obj_in.dict(exclude={"category_ids"}, exclude_unset=True)
+        # Get existing product to maintain shop_id
+        existing_product = super().get(id)
+        if not existing_product:
+            return None
+            
+        # Verify that all categories exist before proceeding
+        if category_ids:
+            existing_categories = self.db_session.query(Category).filter(
+                Category.id.in_(category_ids)
+            ).all()
+            existing_category_ids = {str(cat.id) for cat in existing_categories}
+            missing_categories = set(str(cid) for cid in category_ids) - existing_category_ids
+            
+            if missing_categories:
+                raise ValueError(f"Categories with IDs {missing_categories} do not exist")
         
-        # Only update fields that were actually sent
-        if clean_data:
-            clean_product = ProductBase(**clean_data)
-            db_product = super().update(id, clean_product)
-        else:
-            # No product fields to update → just get existing
-            db_product = super().get(id)
+        # Get only SET fields from ProductCreate and maintain shop_id
+        clean_data = obj_in.dict(exclude={"category_ids"}, exclude_unset=True)
+        clean_data["shop_id"] = existing_product.shop_id
+        
+        # Update product data
+        db_product = super().update(id, clean_data)
         
         if not db_product:
             return None
@@ -72,7 +93,7 @@ class ProductRepository(BaseRepository[Product]):
         self.db_session.add(pc)
         self.db_session.commit()
         return True
-
+        
     def remove_category(self, product_id: UUID, category_id: UUID) -> bool:
         pc = self.db_session.query(ProductCategory).filter(
             and_(ProductCategory.product_id == product_id, ProductCategory.category_id == category_id)
