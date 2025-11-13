@@ -1,83 +1,412 @@
+version: '3.9'
+
+networks:
+  microservices:
+    driver: bridge
+
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  # =======================
+  # NGINX - API Gateway
+  # =======================
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx_gateway
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    #disabled for traefik
-    # ports:
-    #   - "5434:5432"
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - auth-service
+      - user-service
+      - shop-service
+      - product-service
+      - order-service
+      - shopcart-service
+      - wishlist-service
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # =======================
+  # AUTH SERVICE
+  # =======================
+  auth-service:
+    build: ./auth-service
+    container_name: auth_service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-this}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_LIFETIME_MINUTES: 60
+      REFRESH_TOKEN_LIFETIME_DAYS: 7
+      USER_SERVICE: http://user-service:8000
+      REDIS_HOST: redis_service
+      REDIS_PORT: 6379
+    depends_on:
+      - redis_service
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # REDIS (for token blacklist)
+  # =======================
+  redis_service:
+    image: redis:7.2-alpine
+    container_name: redis_service
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # =======================
+  # USER SERVICE
+  # =======================
+  user-db:
+    image: postgres:16-alpine
+    container_name: user_db
+    environment:
+      POSTGRES_DB: ${USER_POSTGRES_DB:-ecommerce_db}
+      POSTGRES_USER: ${USER_POSTGRES_USER:-ecommerce_user}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD:-StrongPass123!}
+    volumes:
+      - user-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
-    networks:
-      - internal_net
 
-  web:
-    build: .
-    container_name: order-service
-    depends_on:
-      db:
-        condition: service_healthy
-    env_file:
-      - .env
+  user-service:
+    build: ./user-service
+    container_name: user_service
     environment:
-      SECRET_KEY: ${SECRET_KEY}
-      DEBUG: ${DEBUG}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_HOST: db
-      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${USER_POSTGRES_DB:-ecommerce_db}
+      POSTGRES_USER: ${USER_POSTGRES_USER:-ecommerce_user}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD:-StrongPass123!}
+      POSTGRES_HOST: user-db
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-django-secret}
+      DEBUG: "False"
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: admin
       RABBITMQ_PASS: admin12345
-    volumes:
-      - media:/app/order_service/media
-      - staticfiles:/app/staticfiles
-      # Prevents local .venv from overwriting container packages
-      - /app/.venv
-    #disabled for traefik
-    # ports:
-    #   - "${WEB_PORT:-8003}:8000"
+    depends_on:
+      user-db:
+        condition: service_healthy
     networks:
-      - internal_net
-      - shared_network
+      - microservices
+    restart: unless-stopped
 
-    # labels:
-    #   #  Enable Traefik routing only for admin panel
-    #   - "traefik.enable=true"
-      
-    #   # Route only /admin/* to this service
-    #   - "traefik.http.routers.order-admin.rule=PathPrefix(`/order-admin`)"
-      
-    #   # Use same web entrypoint (port 80)
-    #   - "traefik.http.routers.order-admin.entrypoints=web"
-      
-    #   # Define the internal service port Django runs on
-    #   - "traefik.http.services.order-admin.loadbalancer.server.port=8000"
+  # =======================
+  # SHOP SERVICE
+  # =======================
+  shop-db:
+    image: postgres:16-alpine
+    container_name: shop_db
+    environment:
+      POSTGRES_DB: ${SHOP_POSTGRES_DB:-shop_service}
+      POSTGRES_USER: ${SHOP_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - shop-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
+  shop-service:
+    build: ./shop-service
+    container_name: shop_service
+    environment:
+      POSTGRES_DB: ${SHOP_POSTGRES_DB:-shop_service}
+      POSTGRES_USER: ${SHOP_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_HOST: shop-db
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-django-secret}
+      DEBUG: "False"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+    depends_on:
+      shop-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # PRODUCT SERVICE
+  # =======================
+  product-db:
+    image: postgres:15-alpine
+    container_name: product_db
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - product-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  product-service:
+    build: ./product-service
+    container_name: product_service
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@product-db:5432/mydb
+    depends_on:
+      product-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    command: >
+      sh -c ". .venv/bin/activate && 
+             alembic upgrade head && 
+             uvicorn src.app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+
+  # =======================
+  # ORDER SERVICE
+  # =======================
+  order-db:
+    image: postgres:16-alpine
+    container_name: order_db
+    environment:
+      POSTGRES_DB: ${ORDER_POSTGRES_DB:-order_service}
+      POSTGRES_USER: ${ORDER_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORDER_POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - order-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build: ./order-service
+    container_name: order_service
+    environment:
+      POSTGRES_DB: ${ORDER_POSTGRES_DB:-order_service}
+      POSTGRES_USER: ${ORDER_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${ORDER_POSTGRES_PASSWORD:-postgres}
+      POSTGRES_HOST: order-db
+      POSTGRES_PORT: 5432
+      SECRET_KEY: ${SECRET_KEY:-django-secret}
+      DEBUG: "False"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+    depends_on:
+      order-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # SHOPCART SERVICE
+  # =======================
+  shopcart-db:
+    image: postgres:16-alpine
+    container_name: shopcart_db
+    environment:
+      POSTGRES_DB: ${SHOPCART_DB:-shopcart_db}
+      POSTGRES_USER: ${SHOPCART_USER:-postgres}
+      POSTGRES_PASSWORD: ${SHOPCART_PASSWORD:-4444}
+    volumes:
+      - shopcart-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  shopcart-service:
+    build: ./shopcart-service
+    container_name: shopcart_service
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:4444@shopcart-db:5432/shopcart_db
+      DB_HOST: shopcart-db
+      DB_USER: postgres
+      DB_PASSWORD: "4444"
+      DB_NAME: shopcart_db
+      DB_PORT: 5432
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+      PRODUCT_SERVICE: http://product-service:8000
+      SECRET_KEY: ${SECRET_KEY:-secret}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      shopcart-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # WISHLIST SERVICE
+  # =======================
+  wishlist-db:
+    image: postgres:16-alpine
+    container_name: wishlist_db
+    environment:
+      POSTGRES_DB: ${WISHLIST_DB:-wishlist_db}
+      POSTGRES_USER: ${WISHLIST_USER:-postgres}
+      POSTGRES_PASSWORD: ${WISHLIST_PASSWORD:-postgres}
+    volumes:
+      - wishlist-pgdata:/var/lib/postgresql/data
+    networks:
+      - microservices
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wishlist-service:
+    build: ./wishlist-service
+    container_name: wishlist_service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@wishlist-db:5432/wishlist_db
+      SECRET_KEY: ${SECRET_KEY:-secret}
+      DEBUG: "False"
+      PRODUCT_SERVICE: http://product-service:8000
+      SHOP_SERVICE: http://shop-service:8000
+    depends_on:
+      wishlist-db:
+        condition: service_healthy
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # RABBITMQ (Message Broker)
+  # =======================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin12345
+    ports:
+      - "15672:15672"  # Management UI
+    networks:
+      - microservices
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =======================
+  # PROMETHEUS (Metrics)
+  # =======================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # GRAFANA (Visualization)
+  # =======================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - microservices
+    restart: unless-stopped
+
+  # =======================
+  # NODE EXPORTER (System Metrics)
+  # =======================
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - microservices
+    restart: unless-stopped
 
 volumes:
-  pgdata:
-  media:
-  staticfiles:
-
-networks:
-  internal_net:
-  # internal: true
-    driver: bridge
-  shared_network:
-    # driver: bridge
-    external: true
-    name: shared_network
+  user-pgdata:
+  shop-pgdata:
+  product-pgdata:
+  order-pgdata:
+  shopcart-pgdata:
+  wishlist-pgdata:
+  redis_data:
+  nginx_logs:
+  prometheus_data:
+  grafana_data:
