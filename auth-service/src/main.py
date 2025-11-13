@@ -24,7 +24,7 @@ JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-this')
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 ACCESS_TOKEN_LIFETIME_MINUTES = int(os.getenv('ACCESS_TOKEN_LIFETIME_MINUTES', 60))
 REFRESH_TOKEN_LIFETIME_DAYS = int(os.getenv('REFRESH_TOKEN_LIFETIME_DAYS', 7))
-USER_SERVICE_URL = os.getenv('USER_SERVICE', 'http://user-service-web-1:8000')
+USER_SERVICE_URL = os.getenv('USER_SERVICE', 'http://user-service:8000')
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis_service')
 REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
 

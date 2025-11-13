@@ -40,7 +40,7 @@ services:
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_LIFETIME_MINUTES: 60
       REFRESH_TOKEN_LIFETIME_DAYS: 7
-      USER_SERVICE: http://user-service-web-1:8000
+      USER_SERVICE: http://user-service:8000
       REDIS_HOST: redis_service
       REDIS_PORT: 6379
     depends_on:
@@ -82,7 +82,7 @@ services:
       timeout: 5s
       retries: 10
 
-  user-service-web-1:
+  user-service:
     build: ./user-service
     container_name: user_service
     environment:
@@ -124,7 +124,7 @@ services:
       timeout: 5s
       retries: 10
 
-  shop-service-web-1:
+  shop-service:
     build: ./shop-service
     container_name: shop_service
     environment:
@@ -166,7 +166,7 @@ services:
       timeout: 5s
       retries: 10
 
-  product-service-web-1:
+  product-service:
     build: ./product-service
     container_name: product_service
     environment:
@@ -202,7 +202,7 @@ services:
       timeout: 5s
       retries: 10
 
-  order-service-web-1:
+  order-service:
     build: ./order-service
     container_name: order_service
     environment:
@@ -385,6 +385,6 @@ volumes:
   order-pgdata:
   shopcart-pgdata:
   wishlist-pgdata:
-  #monitoring  
+  #monitoring tools
   prometheus_data:
   grafana_data:
