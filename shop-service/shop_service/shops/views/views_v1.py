@@ -15,6 +15,7 @@ from drf_spectacular.types import OpenApiTypes
 from ..models import * 
 from ..serializers import *
 from utils.pagination import CustomPagination
+from utils.order_client import order_client
 from shop_service.authentication import GatewayHeaderAuthentication
 from shop_service.messaging import publisher
 
@@ -28,7 +29,6 @@ __all__ = [
     'ShopCreateAPIView',
     'ShopManagementAPIView',
     'UserShopAPIView',
-    'ShopStatusManagementAPIView',
     'ShopBranchListByShopAPIView',
     'ShopBranchDetailAPIView',
     'CreateShopBranchAPIView',
@@ -43,6 +43,9 @@ __all__ = [
     'ShopSocialMediaDetailAPIView',
     'CreateShopSocialMediaAPIView',
     'ShopSocialMediaManagementAPIView',
+    'ShopOrderItemListAPIView',
+    'ShopOrderItemDetailAPIView',
+    'ShopOrderItemStatusUpdateAPIView',
 ]
 
 # Shop Views
@@ -51,13 +54,6 @@ class ShopListAPIView(APIView):
     http_method_names =['get']
     pagination_class = CustomPagination
 
-    @extend_schema(
-        operation_id='shop_list',
-        summary='List all active shops',
-        description='Get a paginated list of all active shops',
-        tags=['Shop'],
-        responses={200: ShopListSerializer(many=True)}
-    )
     def get(self, request):
         pagination = self.pagination_class()
         shops = Shop.objects.filter(is_active=True, status=Shop.APPROVED)
@@ -73,16 +69,6 @@ class ShopDetailWithSlugAPIView(APIView):
     """Retrieve details of a specific shop by slug."""
     http_method_names =['get']
 
-    @extend_schema(
-        operation_id='shop_detail_by_slug',
-        summary='Get shop by slug',
-        description='Retrieve detailed information about a shop using its slug',
-        tags=['Shop'],
-        parameters=[
-            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
-        ],
-        responses={200: ShopDetailSerializer, 404: None}
-    )
     def get(self, request, shop_slug):
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         serializer = ShopDetailSerializer(shop)
@@ -93,16 +79,6 @@ class ShopDetailWithUuidAPIView(APIView):
     """Retrieve details of a specific shop by uuid."""
     http_method_names =['get']
 
-    @extend_schema(
-        operation_id='shop_detail_by_uuid',
-        summary='Get shop by UUID',
-        description='Retrieve detailed information about a shop using its UUID',
-        tags=['Shop'],
-        parameters=[
-            OpenApiParameter(name='shop_uuid', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='Shop UUID')
-        ],
-        responses={200: ShopDetailSerializer, 404: None}
-    )
     def get(self, request, shop_uuid):
         shop = get_object_or_404(Shop, id=shop_uuid, is_active=True, status=Shop.APPROVED)
         serializer = ShopDetailSerializer(shop)
@@ -120,9 +96,30 @@ class ShopCreateAPIView(APIView):
         summary='Create a new shop',
         description='Create a new shop. Only authenticated users can create shops.',
         tags=['Shop'],
-        request=ShopCreateUpdateSerializer,
-        responses={201: ShopCreateUpdateSerializer, 400: None}
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'name': {
+                        'type': 'string',
+                        'description': 'Shop name'
+                    },
+                    'about': {
+                        'type': 'string',
+                        'description': 'Shop description'
+                    },
+                    'profile': {
+                        'type': 'string',
+                        'format': 'binary',
+                        'description': 'Shop profile image (optional)'
+                    }
+                },
+                'required': ['name']
+            }
+        },
+        responses={201: ShopCreateUpdateSerializer, 400: None},
     )
+    
     def post(self, request):
         user = request.user
         logger.info(f"POST /create/ - Shop creation request from user {user.id}")
@@ -205,19 +202,10 @@ class ShopManagementAPIView(APIView):
 
 
 class UserShopAPIView(APIView):
+    """Retrieve the active shop for a specific user"""
     permission_classes = [AllowAny]
     http_method_names = ['get']
 
-    @extend_schema(
-        operation_id='user_shop',
-        summary='Get shop by user ID',
-        description='Retrieve the active shop for a specific user',
-        tags=['Shop'],
-        parameters=[
-            OpenApiParameter(name='user_id', type=OpenApiTypes.UUID, location=OpenApiParameter.PATH, description='User ID')
-        ],
-        responses={200: ShopDetailSerializer, 404: None, 500: None}
-    )
     def get(self, request, user_id):
         try:
             shop = Shop.objects.filter(user=user_id, is_active=True, status=Shop.APPROVED).first()
@@ -236,16 +224,6 @@ class ShopBranchListByShopAPIView(APIView):
     """Returns a list of active branches for a given shop."""
     http_method_names = ['get']
 
-    @extend_schema(
-        operation_id='branch_list',
-        summary='List shop branches',
-        description='Get a list of active branches for a specific shop',
-        tags=['ShopBranch'],
-        parameters=[
-            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
-        ],
-        responses={200: ShopBranchListSerializer(many=True), 400: None}
-    )
     def get(self, request, shop_slug):
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         shop_branches = ShopBranch.objects.filter(shop=shop, is_active=True)
@@ -263,16 +241,6 @@ class ShopBranchDetailAPIView(APIView):
     """Returns detailed information about a specific branch by its slug."""
     http_method_names =['get']
 
-    @extend_schema(
-        operation_id='branch_detail',
-        summary='Get branch by slug',
-        description='Retrieve detailed information about a shop branch using its slug',
-        tags=['ShopBranch'],
-        parameters=[
-            OpenApiParameter(name='shop_branch_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Branch slug')
-        ],
-        responses={200: ShopBranchDetailSerializer, 404: None}
-    )
     def get(self, request, shop_branch_slug):
         shop_branch = get_object_or_404(ShopBranch, slug=shop_branch_slug, is_active=True)
         serializer = ShopBranchDetailSerializer(shop_branch)
@@ -386,16 +354,6 @@ class CommentListByShopAPIView(APIView):
     pagination_class = CustomPagination
     http_method_names = ['get']
 
-    @extend_schema(
-        operation_id='comment_list',
-        summary='List shop comments',
-        description='Get a paginated list of comments for a specific shop',
-        tags=['ShopComment'],
-        parameters=[
-            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
-        ],
-        responses={200: ShopCommentSerializer(many=True)}
-    )
     def get(self, request, shop_slug):
         pagination = self.pagination_class()
         shop = get_object_or_404(Shop.objects.filter(is_active=True, status=Shop.APPROVED), slug=shop_slug)
@@ -504,16 +462,6 @@ class ShopMediaByShopAPIView(APIView):
     """Returns a media for a given shop."""
     http_method_names = ['get']
 
-    @extend_schema(
-        operation_id='media_list',
-        summary='List shop media',
-        description='Get a list of media files for a specific shop',
-        tags=['ShopMedia'],
-        parameters=[
-            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
-        ],
-        responses={200: ShopMediaSerializer(many=True), 400: None}
-    )
     def get(self, request, shop_slug):
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         social_medias = ShopMedia.objects.filter(shop=shop)
@@ -540,7 +488,28 @@ class CreateShopMediaAPIView(APIView):
         parameters=[
             OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
         ],
-        request=ShopMediaSerializer,
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'image': {
+                        'type': 'string',
+                        'format': 'binary',
+                        'description': 'Image file (JPEG or PNG, max 5MB)'
+                    },
+                    'alt_text': {
+                        'type': 'string',
+                        'description': 'Alt text for the image'
+                    },
+                    'shop': {
+                        'type': 'string',
+                        'format': 'uuid',
+                        'description': 'Shop UUID'
+                    }
+                },
+                'required': ['image', 'shop']
+            }
+        },
         responses={201: ShopMediaSerializer, 400: None, 403: None}
     )
     def post(self, request, shop_slug):
@@ -601,16 +570,6 @@ class ShopSocialMediaListByShopAPIView(APIView):
     """Returns a list of branches for a given shop."""
     http_method_names = ['get']
 
-    @extend_schema(
-        operation_id='social_media_list',
-        summary='List shop social media',
-        description='Get a list of social media links for a specific shop',
-        tags=['ShopSocialMedia'],
-        parameters=[
-            OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
-        ],
-        responses={200: ShopSocialMediaSerializer(many=True), 400: None}
-    )
     def get(self, request, shop_slug):
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         social_medias = ShopSocialMedia.objects.filter(shop=shop)
@@ -628,16 +587,6 @@ class ShopSocialMediaDetailAPIView(APIView):
     """Returns detailed information about a specific social media by its id."""
     http_method_names = ['get']
     
-    @extend_schema(
-        operation_id='social_media_detail',
-        summary='Get social media by ID',
-        description='Retrieve detailed information about a shop social media using its ID',
-        tags=['ShopSocialMedia'],
-        parameters=[
-            OpenApiParameter(name='social_media_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Social media ID')
-        ],
-        responses={200: ShopSocialMediaSerializer, 404: None}
-    )
     def get(self, request, social_media_id):
         social_media = get_object_or_404(ShopSocialMedia, id=social_media_id)
         serializer = ShopSocialMediaSerializer(social_media)
@@ -743,98 +692,88 @@ class ShopSocialMediaManagementAPIView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# ShopOrderItem Views
+class ShopOrderItemListAPIView(APIView):
+    """List all order items for a specific shop. Only shop owner can view."""
+    http_method_names = ['get']
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [GatewayHeaderAuthentication]
+    pagination_class = CustomPagination
 
-from rest_framework.permissions import IsAdminUser
+    def get(self, request, shop_slug):
+        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        pagination = self.pagination_class()
+        order_items = ShopOrderItem.objects.filter(shop=shop)
+        paginated_items = pagination.paginate_queryset(order_items, request)
 
-# Add this view to the views file
-class ShopStatusManagementAPIView(APIView):
-    """
-    Admin endpoint to approve/reject shop status.
-    Only staff/admin users can change shop status.
-    """
+        if paginated_items is not None:
+            serializer = ShopOrderItemSerializer(paginated_items, many=True)
+            return pagination.get_paginated_response(serializer.data)
+        
+        serializer = ShopOrderItemSerializer(order_items, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ShopOrderItemDetailAPIView(APIView):
+    """Get details of a specific order item. Only shop owner can view."""
+    http_method_names = ['get']
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [GatewayHeaderAuthentication]
+
+    def get(self, request, order_item_id):
+        order_item = get_object_or_404(ShopOrderItem, id=order_item_id)
+        serializer = ShopOrderItemSerializer(order_item)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ShopOrderItemStatusUpdateAPIView(APIView):
+    """Update the status of an order item. Only shop owner can update."""
     http_method_names = ['patch']
     permission_classes = [IsAuthenticated]
     authentication_classes = [GatewayHeaderAuthentication]
 
     @extend_schema(
-        operation_id='shop_status_update',
-        summary='Update shop status (Admin only)',
-        description='Update shop status to APPROVED, PENDING, or REJECTED. Only admin users can perform this action.',
-        tags=['Shop'],
+        operation_id='shop_order_item_status_update',
+        summary='Update order item status',
+        description='Update the status of an order item. Only the shop owner can update.',
+        tags=['ShopOrderItem'],
         parameters=[
-            OpenApiParameter(
-                name='shop_slug', 
-                type=OpenApiTypes.STR, 
-                location=OpenApiParameter.PATH, 
-                description='Shop slug'
-            )
+            OpenApiParameter(name='order_item_id', type=OpenApiTypes.INT, location=OpenApiParameter.PATH, description='Order item ID')
         ],
-        request={
-            'application/json': {
-                'type': 'object',
-                'properties': {
-                    'status': {
-                        'type': 'string',
-                        'enum': ['APPROVED', 'PENDING', 'REJECTED'],
-                        'description': 'New status for the shop'
-                    }
-                },
-                'required': ['status']
-            }
-        },
-        responses={
-            200: {
-                'description': 'Shop status updated successfully',
-                'content': {
-                    'application/json': {
-                        'example': {
-                            'message': 'Shop status updated to APPROVED',
-                            'shop_id': '123e4567-e89b-12d3-a456-426614174000',
-                            'status': 'APPROVED'
-                        }
-                    }
-                }
-            },
-            400: None,
-            403: None,
-            404: None
-        }
+        request=ShopOrderItemStatusUpdateSerializer,
+        responses={200: ShopOrderItemSerializer, 400: None, 403: None, 404: None}
     )
-    def patch(self, request, shop_slug):
+    def patch(self, request, order_item_id):
         user = request.user
-        logger.info(f"PATCH /shops/{shop_slug}/status/ - Status update request from user {user.id}")
-        
-        # Check if user is admin/staff
-        # Note: Since we're using GatewayHeaderAuthentication with a simple user object,
-        # you might need to check this differently. For now, checking is_superuser equivalent
-        # You may need to adjust this based on your authentication setup
-        
-        shop = get_object_or_404(Shop, slug=shop_slug)
-        
-        new_status = request.data.get('status')
-        if not new_status:
-            logger.warning(f"PATCH /shops/{shop_slug}/status/ - Missing status field")
-            return Response(
-                {'error': 'Status field is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
+        order_item = get_object_or_404(ShopOrderItem, id=order_item_id)
+        serializer = ShopOrderItemStatusUpdateSerializer(order_item, data=request.data, partial=True)
+        if serializer.is_valid():
+            new_status = serializer.validated_data.get('status')
+            
+            # Update status in order-service (source of truth)
+            # Shop-service will receive status update via RabbitMQ event
+            order_service_response = order_client.update_order_item_status(
+                order_item_id=order_item_id,
+                status=new_status,
+                shop_owner_user_id=str(user.id)  
             )
+            
+            if order_service_response is None:
+                logger.error(f"Failed to update order item {order_item_id} status in order service")
+                return Response(
+                    {'error': 'Failed to update order item status in order service'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Update local status from order-service response (source of truth)
+            updated_status = order_service_response.get('status')
+            if updated_status is not None:
+                order_item.status = updated_status
+                order_item.save(update_fields=['status'])
+            
+            full_serializer = ShopOrderItemSerializer(order_item)
+            return Response(full_serializer.data, status=status.HTTP_200_OK)
         
-        if new_status not in [Shop.APPROVED, Shop.PENDING, Shop.REJECTED]:
-            logger.warning(f"PATCH /shops/{shop_slug}/status/ - Invalid status: {new_status}")
-            return Response(
-                {'error': f'Invalid status. Must be one of: {Shop.APPROVED}, {Shop.PENDING}, {Shop.REJECTED}'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        logger.warning(f"PATCH /order-items/{order_item_id}/status/ - Validation failed: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        old_status = shop.status
-        shop.status = new_status
-        shop.save()
-        
-        logger.info(f"PATCH /shops/{shop_slug}/status/ - Shop {shop.id} status changed from {old_status} to {new_status}")
-        
-        return Response({
-            'message': f'Shop status updated to {new_status}',
-            'shop_id': str(shop.id),
-            'status': shop.status,
-            'old_status': old_status
-        }, status=status.HTTP_200_OK)

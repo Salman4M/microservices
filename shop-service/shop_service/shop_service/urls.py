@@ -2,14 +2,15 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf.urls.static import static
 from django.conf import settings
+from django.shortcuts import redirect
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework.permissions import AllowAny
 from rest_framework.renderers import JSONRenderer
 
 urlpatterns = [
-    # path('admin/', admin.site.urls)
-    path('shop-admin/', admin.site.urls), 
+    path('admin/', admin.site.urls),
     path('api/', include('shops.urls_v1')),
+    path('', lambda request: redirect('admin/', permanent=False))
 ]
 
 urlpatterns += (

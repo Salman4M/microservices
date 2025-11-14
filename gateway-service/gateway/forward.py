@@ -21,7 +21,7 @@ async def forward_request(service: str, path: str, request):
     headers = _prepare_headers(request, service)
     body = await request.body()
     
-    logger.info("Forwarding request to {url} | Method: {request.method}")
+    logger.info(f"Forwarding request to {url} | Method: {request.method}")
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT, verify=False) as client:

@@ -18,11 +18,15 @@ class ShopServiceClient:
     async def get_shop_by_user_id(self, user_id: str) -> Optional[str]:
         try:
             url = f'{self.base_url}/api/user/{user_id}/'
+
+            headers = {'Content-Type': 'application/json'}
+            if user_id:
+                headers['X-User-ID'] = str(user_id)
             
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     url,
-                    headers={'Content-Type': 'application/json'}
+                    headers=headers
                 )
                 
                 if response.status_code == 200:

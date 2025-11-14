@@ -13,7 +13,8 @@ __all__ = [
     'ShopMedia',
     'ShopBranch',
     'ShopSocialMedia',
-    'ShopComment'
+    'ShopComment',
+    'ShopOrderItem'
 ]
 
 class Shop(SluggedModel):
@@ -244,3 +245,70 @@ class ShopSocialMedia(models.Model):
 
     def __str__(self):
         return f'{self.shop.id}: {self.media_name}'
+    
+
+# ShopOrderItem 
+class ShopOrderItem(models.Model):
+    class Status(models.IntegerChoices):
+        PROCESSING = 1, 'Processing'
+        SHIPPED = 2, 'Shipped'
+        DELIVERED = 3, 'Delivered'
+        CANCELLED = 4, 'Cancelled'
+
+    id = models.BigIntegerField(
+        primary_key=True
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.CASCADE,
+        related_name='order_items',
+        verbose_name='Shop'
+    )
+    order_id = models.BigIntegerField(
+        verbose_name='Order ID'
+    )
+    product_id = models.CharField(
+        max_length=36, 
+        null=True, 
+        blank=True, 
+        verbose_name='Product ID'
+    )
+    product_variation = models.CharField(
+        max_length=36, 
+        verbose_name='Product Variation ID'
+    )
+    quantity = models.IntegerField(
+        default=1, 
+        verbose_name='Quantity'
+    )
+    price = models.BigIntegerField(
+        verbose_name='Price (in qepik)'
+    )
+    status = models.IntegerField(
+        choices=Status.choices, 
+        default=Status.PROCESSING, 
+        verbose_name='Status'
+    )
+    user_id = models.CharField(
+        max_length=36, 
+        verbose_name='User ID (customer)'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        verbose_name='Created at'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        verbose_name='Updated at'
+    )
+
+    class Meta:
+        verbose_name_plural = 'ShopOrderItems'
+        ordering = ('-created_at',)
+        indexes = [
+            models.Index(fields=['shop', 'status']),
+            models.Index(fields=['order_id']),
+        ]
+
+    def __str__(self):
+        return f'OrderItem#{self.id} - Shop: {self.shop.id}'

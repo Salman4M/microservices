@@ -34,8 +34,9 @@ class ProductUpdate(ProductBase):
     base_price: Optional[float] = Field(None, gt=0)
     category_ids: Optional[List[UUID]] = None  # ← OPTIONAL FOR UPDATE
 
-class Product(ProductBase):
+class Product(ProductBase): 
     id: UUID
+    shop_id: Optional[UUID] = None
     created_at: datetime
 
 #    categories: List["Category"] = []
