@@ -20,12 +20,16 @@ class ShopServiceClient:
 
         url = f'{self.base_url}/api/user/{user_id}/'
         try:
+            headers = {
+                'Content-Type': 'application/json',
+            }
+            if user_id:
+                headers['X-User-ID'] = str(user_id)
+            
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 response = client.get(
                     url,
-                    headers={
-                        'Content-Type': 'application/json',
-                    }
+                    headers=headers
                 )
 
             if response.status_code == 200:

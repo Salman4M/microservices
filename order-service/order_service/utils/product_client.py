@@ -14,15 +14,19 @@ class ProductServiceClient:
         self.base_url = PRODUCT_SERVICE
         self.timeout = 30.0
     
-    def get_variation(self, variation_id: str) -> Optional[dict]:
+    def get_variation(self, variation_id: str, user_id: Optional[str] = None) -> Optional[dict]:
         url = f'{self.base_url}/api/products/variations/{variation_id}'
         try:
+            headers = {
+                'Content-Type': 'application/json',
+            }
+            if user_id:
+                headers['X-User-ID'] = str(user_id)
+            
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 response = client.get(
                     url,
-                    headers={
-                        'Content-Type': 'application/json',
-                    }
+                    headers=headers
                 )
             
             if response.status_code == 200:
@@ -37,16 +41,20 @@ class ProductServiceClient:
         except Exception as e:
             raise
 
-    def get_product(self, product_id: str) -> Optional[dict]:
+    def get_product(self, product_id: str, user_id: Optional[str] = None) -> Optional[dict]:
         url = f'{self.base_url}/api/products/{product_id}'
         
         try:
+            headers = {
+                'Content-Type': 'application/json',
+            }
+            if user_id:
+                headers['X-User-ID'] = str(user_id)
+            
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 response = client.get(
                     url,
-                    headers={
-                        'Content-Type': 'application/json',
-                    }
+                    headers=headers
                 )
             
             if response.status_code == 200:
