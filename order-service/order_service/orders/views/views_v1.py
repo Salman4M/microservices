@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 import logging
-from utils.rabbitmq_producer import rabbitmq_producer
+from order_service.messaging import rabbitmq_producer
 from utils.shopcart_client import shopcart_client
 from utils.product_client import product_client
 from utils.shop_client import shop_client
@@ -169,7 +169,7 @@ def create_order_from_shopcart(request):
             return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         event_items.append({
-            'product_variation_id': str(item.get('product_variation_id')),
+            'product_variation_id': str(variation_id),
             'quantity': item.get('quantity', 1)
         })
 

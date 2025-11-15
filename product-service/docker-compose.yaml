@@ -34,6 +34,28 @@ services:
     networks:
       - internal_net
 
+  product_consumer:
+    build: .
+    container_name: product_consumer
+    entrypoint: []
+    command: ["python", "/app/consumer.py"]
+    depends_on:
+      - db
+      - product-service-web-1
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: admin
+      RABBITMQ_PASS: admin12345
+    volumes:
+      - ./src:/app/src:rw
+      - ./consumer.py:/app/consumer.py:rw
+    networks:
+      - internal_net
+      - shared_network
+    restart: unless-stopped
+
 networks:
   internal_net:
   # internal: true
