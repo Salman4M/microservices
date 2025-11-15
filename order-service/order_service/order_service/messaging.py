@@ -27,6 +27,21 @@ class RabbitMQPublisher:
         return pika.BlockingConnection(parameters)
 
     def publish_order_created(self, order_id: int, user_uuid: str, cart_id: int, items: list = None):
+        """
+        Publish order.created event with item details for stock reduction
+        
+        Args:
+            order_id: ID of created order
+            user_uuid: User who created the order
+            cart_id: Shopping cart ID
+            items: List of order items with structure:
+                [
+                    {
+                        "product_variation_id": "uuid",
+                        "quantity": 2
+                    }
+                ]
+        """
         try:
             conn = self.get_connection()
             channel = conn.channel()
@@ -38,7 +53,7 @@ class RabbitMQPublisher:
                     'order_id': order_id,
                     'user_uuid': str(user_uuid),
                     'cart_id': cart_id,
-                    'items':items or []
+                    'items': items or []  # ✅ Include items for Product Service
                 }
             }
 
@@ -52,12 +67,12 @@ class RabbitMQPublisher:
                 )
             )
 
-            logger.info(f"published order.created event | order={order_id}")
+            logger.info(f"✅ Published order.created event | order={order_id} items={len(items or [])}")
             conn.close()
             return True
 
         except Exception as e:
-            logger.error(f"failed to publish order.created event: {e}", exc_info=True)
+            logger.error(f"❌ Failed to publish order.created event: {e}", exc_info=True)
             return False
 
     def publish_order_items(self, order_id: str, items: list):
@@ -125,7 +140,6 @@ class RabbitMQPublisher:
                 )
             )
 
-            # Log is handled in signal handler
             logger.debug(f"Published order.item.created event - OrderItem: {order_item_id}, Shop: {shop_id}, Order: {order_id}")
             conn.close()
             return True
