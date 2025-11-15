@@ -34,11 +34,12 @@ services:
     networks:
       - internal_net
 
+
   product_consumer:
     build: .
     container_name: product_consumer
     entrypoint: []
-    command: ["python", "/app/consumer.py"]
+    command: [".venv/bin/python", "/app/consumer.py"]
     depends_on:
       - db
       - product-service-web-1
