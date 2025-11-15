@@ -120,7 +120,8 @@ def create_order_from_shopcart(request):
     else:
         logger.error(f'Order serializer errors: {order_serializer.errors}')
         return Response(order_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
+    event_items = []
     for item in items:
         ####################################################################################last changes
         variation_id = item.get('product_variation_id')
@@ -167,15 +168,21 @@ def create_order_from_shopcart(request):
             logger.error(f'Order item serializer errors: {item_serializer.errors}')
             return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        event_items.append({
+            'product_variation_id': str(item.get('product_variation_id')),
+            'quantity': item.get('quantity', 1)
+        })
+
     try:
         success = rabbitmq_producer.publish_order_created(
             order_id=order.id,
             user_uuid=user_id,
-            cart_id=cart_id
+            cart_id=cart_id,
+            items=event_items  
         )
         
         if success:
-            logger.info(f'✅ Published order.created event - Order: {order.id}, Cart: {cart_id}')
+            logger.info(f'✅ Published order.created event - Order: {order.id}, Cart: {cart_id}, Items: {len(event_items)}')
         else:
             logger.warning(f'⚠️ Failed to publish order.created event - Order: {order.id}')
     except Exception as e:
@@ -190,7 +197,6 @@ def create_order_from_shopcart(request):
         },
         status=status.HTTP_201_CREATED
     )
-
 
 
 @api_view(['PATCH'])

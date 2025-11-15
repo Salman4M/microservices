@@ -26,7 +26,7 @@ class RabbitMQPublisher:
         )
         return pika.BlockingConnection(parameters)
 
-    def publish_order_created(self, order_id: int, user_uuid: str, cart_id: int):
+    def publish_order_created(self, order_id: int, user_uuid: str, cart_id: int, items: list = None):
         try:
             conn = self.get_connection()
             channel = conn.channel()
@@ -38,6 +38,7 @@ class RabbitMQPublisher:
                     'order_id': order_id,
                     'user_uuid': str(user_uuid),
                     'cart_id': cart_id,
+                    'items':items or []
                 }
             }
 
