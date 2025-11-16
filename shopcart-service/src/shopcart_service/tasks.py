@@ -14,10 +14,7 @@ load_dotenv()
 PRODUCT_SERVICE = os.getenv('PRODUCT_SERVICE')
 
 def verify_product_exists(variation_id: UUID):
-    """
-    Check product variation existence and get current stock.
-    Returns dict with amount and is_active, or None if not found.
-    """
+
     try:
         url = f'{PRODUCT_SERVICE}/api/products/variations/{str(variation_id)}'
         response = requests.get(url, timeout=30)
@@ -48,12 +45,7 @@ def verify_product_exists(variation_id: UUID):
 
 @celery.task(name='shopcart_service.tasks.sync_cart_stock')
 def sync_cart_stock():
-    """
-    Periodic task to sync cart items with product stock.
-    - Removes items that are out of stock or inactive
-    - Adjusts quantities if stock is lower than cart quantity
-    Runs every minute.
-    """
+
     db: Session = None
     
     try:
@@ -189,10 +181,7 @@ def sync_cart_stock():
 
 @celery.task(name='shopcart_service.tasks.test_db_connection')
 def test_db_connection():
-    """
-    Test task to verify database connectivity and see cart contents.
-    Use this for debugging.
-    """
+
     db: Session = None
     
     try:
