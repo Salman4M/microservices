@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 import logging
+import httpx
 from order_service.messaging import rabbitmq_producer
 from utils.shopcart_client import shopcart_client
 from utils.product_client import product_client
@@ -95,12 +96,15 @@ def orderitems_detail(request, pk):
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
+
+
+
 @api_view(['POST'])
 def create_order_from_shopcart(request):
     user_id = str(request.user.id)
 
+    # Step 1: Get shopcart data
     shopcart_data = shopcart_client.get_shopcart_data(user_id)
-
     if not shopcart_data:
         return Response({"detail": "Shopcart not found"}, status=status.HTTP_404_NOT_FOUND)
     
@@ -110,94 +114,275 @@ def create_order_from_shopcart(request):
     if not items:
         return Response({"detail": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
-    logger.info(f'Creating order from shopcart - User: {user_id}, Cart ID: {cart_id}, Items: {len(items)}')
-    order_data = {"user_id": user_id}
-    logger.info("This is your items {items}")
-    order_serializer = OrderSerializer(data=order_data)
-    if order_serializer.is_valid():
-        order = order_serializer.save()
-        logger.info(f'Order created successfully - Order ID: {order.id}, User: {user_id}, Items: {len(items)}')
-    else:
-        logger.error(f'Order serializer errors: {order_serializer.errors}')
-        return Response(order_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    logger.info(f'🛒 Creating order from shopcart - User: {user_id}, Cart ID: {cart_id}, Items: {len(items)}')
+
+    # Step 2: Validate ALL items have sufficient stock BEFORE creating order
+    validated_items = []
+    stock_issues = []  # Track items with stock problems
     
-    event_items = []
     for item in items:
-        ####################################################################################last changes
         variation_id = item.get('product_variation_id')
-        if not variation_id:
-            logger.error(f'Missing product_variation_id in cart item')
-            return Response({"error": "Missing product_variation_id"}, status=status.HTTP_400_BAD_REQUEST)
+        quantity = item.get('quantity', 1)
+        cart_item_id = item.get('id')  # Cart item ID for updating
         
-        # Fetch product_id and shop_id from product service
+        if not variation_id:
+            logger.error(f'❌ Missing product_variation_id in cart item')
+            return Response(
+                {"error": "Missing product_variation_id in cart item"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Fetch variation data from product service
         variation_data = product_client.get_variation(str(variation_id), user_id=user_id)
         if not variation_data:
-            logger.error(f'Product variation not found: {variation_id}')
-            return Response({"error": f"Product variation not found: {variation_id}"}, status=status.HTTP_404_NOT_FOUND)
+            logger.error(f'❌ Product variation not found: {variation_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'issue': 'not_found',
+                'action': 'remove'
+            })
+            continue
         
+        # Get product data
         product_id = str(variation_data.get("product_id")) if variation_data.get("product_id") else None
         if not product_id:
-            logger.error(f'Product ID not found in variation data: {variation_id}')
-            return Response({"error": "Product ID not found in variation"}, status=status.HTTP_404_NOT_FOUND)
+            logger.error(f'❌ Product ID not found in variation data: {variation_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'issue': 'invalid_data',
+                'action': 'remove'
+            })
+            continue
         
         product_data = product_client.get_product(product_id, user_id=user_id)
         if not product_data:
-            logger.error(f'Product not found: {product_id}')
-            return Response({"error": f"Product not found: {product_id}"}, status=status.HTTP_404_NOT_FOUND)
+            logger.error(f'❌ Product not found: {product_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'issue': 'product_not_found',
+                'action': 'remove'
+            })
+            continue
+        
+        # Check if product is active
+        if not product_data.get('is_active', True):
+            logger.error(f'❌ Product is not active: {product_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'product_title': product_data.get('title', 'Unknown'),
+                'issue': 'inactive',
+                'action': 'remove'
+            })
+            continue
         
         shop_id = str(product_data.get("shop_id")) if product_data.get("shop_id") else None
         if not shop_id:
-            logger.error(f'Shop ID not found in product data: {product_id}')
-            return Response({"error": "Shop ID not found in product"}, status=status.HTTP_404_NOT_FOUND)
-    
-        order_item_data = {
-            'order': order.id,
-            'product_variation': variation_id,
+            logger.error(f'❌ Shop ID not found in product data: {product_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'issue': 'invalid_shop',
+                'action': 'remove'
+            })
+            continue
+        
+        # ✅ CRITICAL: Validate stock availability
+        available_stock = variation_data.get('amount', 0)
+        
+        # Case 1: Out of stock
+        if available_stock == 0:
+            logger.error(f'❌ Out of stock for {variation_id}')
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'product_title': product_data.get('title', 'Unknown'),
+                'requested_quantity': quantity,
+                'available_stock': 0,
+                'issue': 'out_of_stock',
+                'action': 'remove'
+            })
+            continue
+        
+        # Case 2: Insufficient stock (but some available)
+        if available_stock < quantity:
+            logger.warning(
+                f'⚠️ Insufficient stock for {variation_id}: '
+                f'requested={quantity}, available={available_stock}'
+            )
+            stock_issues.append({
+                'cart_item_id': cart_item_id,
+                'product_variation_id': str(variation_id),
+                'product_title': product_data.get('title', 'Unknown'),
+                'requested_quantity': quantity,
+                'available_stock': available_stock,
+                'issue': 'insufficient_stock',
+                'action': 'update'
+            })
+            continue
+        
+        # Stock is sufficient - add to validated items
+        validated_items.append({
+            'variation_id': variation_id,
             'product_id': product_id,
             'shop_id': shop_id,
-            'quantity': item.get('quantity', 1),
-            'status': 1,  
-            'price': 0  
+            'quantity': quantity,
+            'available_stock': available_stock
+        })
+    
+    # Step 3: If there are stock issues, AUTO-FIX the cart and return error with details
+    if stock_issues:
+        logger.info(f'🔧 Found {len(stock_issues)} stock issues - auto-fixing cart')
+        
+        # Update cart items via shopcart service
+        fixed_items = []
+        for issue in stock_issues:
+            cart_item_id = issue.get('cart_item_id')
+            action = issue.get('action')
+            
+            try:
+                if action == 'remove':
+                    # Delete the cart item
+                    delete_url = f"{shopcart_client.base_url}/shopcart/api/items/{cart_item_id}"
+                    with httpx.Client(timeout=shopcart_client.timeout) as client:
+                        response = client.delete(
+                            delete_url,
+                            headers={
+                                'Content-Type': 'application/json',
+                                'X-User-ID': user_id
+                            }
+                        )
+                    
+                    if response.status_code in [200, 204]:
+                        logger.info(f'✅ Removed cart item {cart_item_id} ({issue.get("issue")})')
+                        fixed_items.append({
+                            'product_variation_id': issue.get('product_variation_id'),
+                            'product_title': issue.get('product_title'),
+                            'action': 'removed',
+                            'reason': issue.get('issue')
+                        })
+                
+                elif action == 'update':
+                    # Update quantity to available stock
+                    new_quantity = issue.get('available_stock')
+                    update_url = f"{shopcart_client.base_url}/shopcart/api/items/{cart_item_id}"
+                    
+                    with httpx.Client(timeout=shopcart_client.timeout) as client:
+                        response = client.put(
+                            update_url,
+                            json={'quantity': new_quantity},
+                            headers={
+                                'Content-Type': 'application/json',
+                                'X-User-ID': user_id
+                            }
+                        )
+                    
+                    if response.status_code == 200:
+                        logger.info(
+                            f'✅ Updated cart item {cart_item_id}: '
+                            f'{issue.get("requested_quantity")} → {new_quantity}'
+                        )
+                        fixed_items.append({
+                            'product_variation_id': issue.get('product_variation_id'),
+                            'product_title': issue.get('product_title'),
+                            'action': 'quantity_updated',
+                            'old_quantity': issue.get('requested_quantity'),
+                            'new_quantity': new_quantity,
+                            'reason': 'insufficient_stock'
+                        })
+                    else:
+                        logger.error(f'❌ Failed to update cart item {cart_item_id}: {response.status_code}')
+                        
+            except Exception as e:
+                logger.error(f'❌ Error fixing cart item {cart_item_id}: {e}')
+        
+        # Return detailed error with all fixes
+        return Response(
+            {
+                "error": "Cart updated due to stock issues",
+                "message": "Your cart has been automatically updated. Please review and try again.",
+                "issues_found": len(stock_issues),
+                "items_fixed": len(fixed_items),
+                "details": fixed_items,
+                "cart_id": cart_id
+            },
+            status=status.HTTP_409_CONFLICT  # 409 = Conflict (cart was modified)
+        )
+    
+    # Step 4: ALL items validated - NOW create the order
+    order_data = {"user_id": user_id}
+    order_serializer = OrderSerializer(data=order_data)
+    
+    if not order_serializer.is_valid():
+        logger.error(f'❌ Order serializer errors: {order_serializer.errors}')
+        return Response(order_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    order = order_serializer.save()
+    logger.info(f'✅ Order created - Order ID: {order.id}, User: {user_id}')
+    
+    # Step 5: Create order items
+    event_items = []
+    for item_data in validated_items:
+        order_item_data = {
+            'order': order.id,
+            'product_variation': item_data['variation_id'],
+            'product_id': item_data['product_id'],
+            'shop_id': item_data['shop_id'],
+            'quantity': item_data['quantity'],
+            'status': 1,
+            'price': 0
         }
-        ####################################################################################last changes
-
+        
         item_serializer = OrderItemSerializer(data=order_item_data)
         if item_serializer.is_valid():
             item_serializer.save()
+            logger.info(
+                f'✅ Order item created - Variation: {item_data["variation_id"]}, '
+                f'Quantity: {item_data["quantity"]}'
+            )
         else:
-            logger.error(f'Order item serializer errors: {item_serializer.errors}')
+            logger.error(f'❌ Order item serializer errors: {item_serializer.errors}')
+            # Rollback order if item creation fails
+            order.delete()
             return Response(item_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
         event_items.append({
-            'product_variation_id': str(variation_id),
-            'quantity': item.get('quantity', 1)
+            'product_variation_id': str(item_data['variation_id']),
+            'quantity': item_data['quantity']
         })
-
+    
+    # Step 6: Publish order.created event (will trigger stock reduction & cart clearing)
     try:
         success = rabbitmq_producer.publish_order_created(
             order_id=order.id,
             user_uuid=user_id,
             cart_id=cart_id,
-            items=event_items  
+            items=event_items
         )
         
         if success:
-            logger.info(f'✅ Published order.created event - Order: {order.id}, Cart: {cart_id}, Items: {len(event_items)}')
+            logger.info(
+                f'✅ Published order.created event - Order: {order.id}, '
+                f'Cart: {cart_id}, Items: {len(event_items)}'
+            )
         else:
             logger.warning(f'⚠️ Failed to publish order.created event - Order: {order.id}')
     except Exception as e:
         logger.error(f'❌ Error publishing order.created event: {e}')
         # Don't fail the order creation if event publishing fails
-
+    
     return Response(
         {
             "message": "Order created successfully",
             "order_id": order.id,
-            "items_count": len(items)
+            "items_count": len(event_items),
+            "total_quantity": sum(item['quantity'] for item in event_items)
         },
         status=status.HTTP_201_CREATED
     )
-
 
 @api_view(['PATCH'])
 def update_order_item_status(request, pk):
