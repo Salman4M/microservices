@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
 import logging
-import httpx
 from order_service.messaging import rabbitmq_producer
 from utils.shopcart_client import shopcart_client
 from utils.product_client import product_client
@@ -98,6 +97,7 @@ def orderitems_detail(request, pk):
     
 
 
+logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 def create_order_from_shopcart(request):
@@ -232,7 +232,9 @@ def create_order_from_shopcart(request):
             'quantity': quantity,
             'available_stock': available_stock
         })
-    
+    logger.info(f'📊 Validation complete - validated_items: {len(validated_items)}, stock_issues: {len(stock_issues)}')
+    if stock_issues:
+        logger.info(f'📋 Stock issues details: {stock_issues}')
     # Step 3: If there are stock issues, AUTO-FIX the cart and return error with details
     if stock_issues:
         logger.info(f'🔧 Found {len(stock_issues)} stock issues - auto-fixing cart')
@@ -245,18 +247,10 @@ def create_order_from_shopcart(request):
             
             try:
                 if action == 'remove':
-                    # Delete the cart item
-                    delete_url = f"{shopcart_client.base_url}/shopcart/api/items/{cart_item_id}"
-                    with httpx.Client(timeout=shopcart_client.timeout) as client:
-                        response = client.delete(
-                            delete_url,
-                            headers={
-                                'Content-Type': 'application/json',
-                                'X-User-ID': user_id
-                            }
-                        )
+                    # Delete the cart item using client method
+                    success = shopcart_client.delete_cart_item(cart_item_id, user_id)
                     
-                    if response.status_code in [200, 204]:
+                    if success:
                         logger.info(f'✅ Removed cart item {cart_item_id} ({issue.get("issue")})')
                         fixed_items.append({
                             'product_variation_id': issue.get('product_variation_id'),
@@ -264,23 +258,15 @@ def create_order_from_shopcart(request):
                             'action': 'removed',
                             'reason': issue.get('issue')
                         })
+                    else:
+                        logger.error(f'❌ Failed to remove cart item {cart_item_id}')
                 
                 elif action == 'update':
-                    # Update quantity to available stock
+                    # Update quantity using client method
                     new_quantity = issue.get('available_stock')
-                    update_url = f"{shopcart_client.base_url}/shopcart/api/items/{cart_item_id}"
+                    success = shopcart_client.update_cart_item(cart_item_id, new_quantity, user_id)
                     
-                    with httpx.Client(timeout=shopcart_client.timeout) as client:
-                        response = client.put(
-                            update_url,
-                            json={'quantity': new_quantity},
-                            headers={
-                                'Content-Type': 'application/json',
-                                'X-User-ID': user_id
-                            }
-                        )
-                    
-                    if response.status_code == 200:
+                    if success:
                         logger.info(
                             f'✅ Updated cart item {cart_item_id}: '
                             f'{issue.get("requested_quantity")} → {new_quantity}'
@@ -294,12 +280,13 @@ def create_order_from_shopcart(request):
                             'reason': 'insufficient_stock'
                         })
                     else:
-                        logger.error(f'❌ Failed to update cart item {cart_item_id}: {response.status_code}')
+                        logger.error(f'❌ Failed to update cart item {cart_item_id}')
                         
             except Exception as e:
                 logger.error(f'❌ Error fixing cart item {cart_item_id}: {e}')
         
-        # Return detailed error with all fixes
+        # IMPORTANT: Return error immediately - don't continue to create order
+        logger.info(f'⚠️ Returning 409 Conflict - Cart was updated, user must retry')
         return Response(
             {
                 "error": "Cart updated due to stock issues",

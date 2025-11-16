@@ -1,21 +1,10 @@
 import httpx
 import os
 import logging
-from typing import Optional,Dict
+from typing import Optional, Dict
 from rest_framework import status
-from rest_framework.exceptions import  APIException
+from rest_framework.exceptions import APIException
 from dotenv import load_dotenv
-
-
-logger = logging.getLogger(__name__)
-
-load_dotenv()
-
-# SHOPCART_SERVICE = os.getenv('SHOPCART_SERVICE')
-
-
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +48,58 @@ class ShopCartServiceDataCheck:
         except Exception as e:
             logger.error(f'Unexpected error in shopcart request - User: {user_uuid}, Error: {str(e)}')
             raise
+    
+    def update_cart_item(self, cart_item_id: int, quantity: int, user_id: str) -> bool:
+        """Update cart item quantity"""
+        url = f'{self.base_url}/shopcart/api/items/{cart_item_id}'
+        
+        try:
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                response = client.put(
+                    url,
+                    json={'quantity': quantity},
+                    headers={
+                        'Content-Type': 'application/json',
+                        'X-User-ID': user_id
+                    }
+                )
+            
+            if response.status_code == 200:
+                logger.info(f'✅ Updated cart item {cart_item_id} to quantity {quantity}')
+                return True
+            else:
+                logger.error(f'❌ Failed to update cart item {cart_item_id}: {response.status_code}')
+                return False
+                
+        except Exception as e:
+            logger.error(f'❌ Error updating cart item {cart_item_id}: {e}')
+            return False
+    
+    def delete_cart_item(self, cart_item_id: int, user_id: str) -> bool:
+        """Delete cart item"""
+        url = f'{self.base_url}/shopcart/api/items/{cart_item_id}'
+        
+        try:
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                response = client.delete(
+                    url,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'X-User-ID': user_id
+                    }
+                )
+            
+            if response.status_code in [200, 204]:
+                logger.info(f'✅ Deleted cart item {cart_item_id}')
+                return True
+            else:
+                logger.error(f'❌ Failed to delete cart item {cart_item_id}: {response.status_code}')
+                return False
+                
+        except Exception as e:
+            logger.error(f'❌ Error deleting cart item {cart_item_id}: {e}')
+            return False
+
 
 shopcart_client = ShopCartServiceDataCheck()
 
