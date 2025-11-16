@@ -30,7 +30,6 @@ class RabbitMQConsumer:
         return pika.BlockingConnection(parameters)
     
     def handle_order_created(self, db: Session, message: dict):
-      
         try:
             data = message.get('data', {})
             items = data.get('items', [])
@@ -38,7 +37,7 @@ class RabbitMQConsumer:
             
             if not items:
                 logger.warning(f"⚠️ No items in order.created event for order {order_id}")
-                return True  # ✅ Return True - shopcart events don't have items
+                return True
             
             logger.info(f"📦 Processing order {order_id} with {len(items)} items")
             
@@ -63,25 +62,25 @@ class RabbitMQConsumer:
                     error_count += 1
                     continue
                 
-                # Check if enough stock
-                if variation.amount < quantity:
-                    logger.error(
-                        f"❌ Insufficient stock for {variation_id}: "
-                        f"requested {quantity}, available {variation.amount}"
-                    )
-                    error_count += 1
-                    # Continue anyway - order already created
-                    continue
-                
-                # Reduce stock
+                # Reduce stock - this should ALWAYS happen since order was already created
                 old_amount = variation.amount
+                
+                # Always reduce stock, even if it goes negative, it doesn't make that sense because
+                # The order service already validated stock before creating the order
                 variation.amount -= quantity
                 updated_count += 1
                 
-                logger.info(
-                    f"✅ Reduced stock for variation {variation_id}: "
-                    f"{old_amount} → {variation.amount} (sold {quantity})"
-                )
+                # Just log a warning if stock went negative (shouldn't happen with proper validation)
+                if variation.amount < 0:
+                    logger.warning(
+                        f"⚠️ Stock went negative for {variation_id}: "
+                        f"{old_amount} → {variation.amount} (sold {quantity})"
+                    )
+                else:
+                    logger.info(
+                        f"✅ Reduced stock for variation {variation_id}: "
+                        f"{old_amount} → {variation.amount} (sold {quantity})"
+                    )
             
             db.commit()
             logger.info(
