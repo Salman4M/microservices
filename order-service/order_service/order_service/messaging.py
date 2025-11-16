@@ -90,21 +90,7 @@ class RabbitMQPublisher:
             raise
     
     def publish_order_created(self, order_id: int, user_uuid: str, cart_id: int, items: list = None):
-        """
-        Publish order.created event with item details for stock reduction
-        
-        Args:
-            order_id: ID of created order
-            user_uuid: User who created the order
-            cart_id: Shopping cart ID
-            items: List of order items with structure:
-                [
-                    {
-                        "product_variation_id": "uuid",
-                        "quantity": 2
-                    }
-                ]
-        """
+
         try:
             self._ensure_connection()
             
@@ -115,7 +101,7 @@ class RabbitMQPublisher:
                     'order_id': order_id,
                     'user_uuid': str(user_uuid),
                     'cart_id': cart_id,
-                    'items': items or []  # ✅ Include items for Product Service
+                    'items': items or [] 
                 }
             }
             
@@ -124,7 +110,7 @@ class RabbitMQPublisher:
                 routing_key='order.created',
                 body=json.dumps(message),
                 properties=pika.BasicProperties(
-                    delivery_mode=2,  # Make message persistent
+                    delivery_mode=2, 
                     content_type='application/json'
                 )
             )

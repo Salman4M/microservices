@@ -144,7 +144,7 @@ def create_order_from_shopcart(request):
             })
             continue
         
-        # Get product data
+        # To check if there is product id in the datas of product variation
         product_id = str(variation_data.get("product_id")) if variation_data.get("product_id") else None
         if not product_id:
             logger.error(f'❌ Product ID not found in variation data: {variation_id}')
@@ -155,7 +155,7 @@ def create_order_from_shopcart(request):
                 'action': 'remove'
             })
             continue
-        
+        # To check if there is a product with that id
         product_data = product_client.get_product(product_id, user_id=user_id)
         if not product_data:
             logger.error(f'❌ Product not found: {product_id}')
@@ -167,7 +167,7 @@ def create_order_from_shopcart(request):
             })
             continue
         
-        # Check if product is active
+        # To check if product is active
         if not product_data.get('is_active', True):
             logger.error(f'❌ Product is not active: {product_id}')
             stock_issues.append({

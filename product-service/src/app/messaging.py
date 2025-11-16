@@ -30,25 +30,7 @@ class RabbitMQConsumer:
         return pika.BlockingConnection(parameters)
     
     def handle_order_created(self, db: Session, message: dict):
-        """
-        Handle order.created event - reduce product stock
-        
-        Expected message format:
-        {
-            "event": "order.created",
-            "data": {
-                "order_id": 123,
-                "user_uuid": "uuid",
-                "cart_id": 456,
-                "items": [
-                    {
-                        "product_variation_id": "uuid",
-                        "quantity": 2
-                    }
-                ]
-            }
-        }
-        """
+      
         try:
             data = message.get('data', {})
             items = data.get('items', [])
@@ -89,7 +71,6 @@ class RabbitMQConsumer:
                     )
                     error_count += 1
                     # Continue anyway - order already created
-                    # You might want to handle this differently
                     continue
                 
                 # Reduce stock
