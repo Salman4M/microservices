@@ -1,0 +1,140 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    container_name: elasticsearch
+    environment:
+      - node.name=es-node
+      - discovery.type=single-node
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - xpack.security.enabled=true
+    networks:
+      - shared_network
+    restart: always
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "elasticsearch" 
+
+  setup_kibana_password:
+    image: curlimages/curl:latest
+    container_name: setup_kibana_password
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Waiting for Elasticsearch..."
+        until curl -s -u "$${ELASTIC_USERNAME:-elastic}:$${ELASTIC_PASSWORD}" "$${ELASTIC_HOST}" > /dev/null 2>&1; do
+          sleep 2
+        done
+        echo "Setting kibana_system password..."
+        curl -X POST -u "$${ELASTIC_USERNAME:-elastic}:$${ELASTIC_PASSWORD}" \
+          "$${ELASTIC_HOST}/_security/user/kibana_system/_password" \
+          -H "Content-Type: application/json" \
+          -d "{\"password\":\"$${KIBANA_SYSTEM_PASSWORD:-$${ELASTIC_PASSWORD}}\"}" \
+          || echo "Password may already be set"
+    environment:
+      - ELASTIC_HOST=${ELASTIC_HOST}
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD:-${ELASTIC_PASSWORD}}
+    depends_on:
+      - elasticsearch
+    networks:
+      - shared_network
+    restart: "no"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=${ELASTIC_HOST}
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASSWORD:-${ELASTIC_PASSWORD}}
+      - SERVERNAME=kibana
+      - SERVER_HOST=0.0.0.0
+    depends_on:
+      - elasticsearch
+      - setup_kibana_password
+    networks:
+      - shared_network
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kibana.rule=Host(`kibana-admin.localhost`)"
+      - "traefik.http.routers.kibana.entrypoints=web"
+      - "traefik.http.services.kibana.loadbalancer.server.port=5601"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "kibana"
+  
+  consumer:
+    build: .
+    container_name: elastic_consumer
+    env_file:
+      - .env
+    environment:
+      - ELASTIC_HOST=${ELASTIC_HOST:-http://elasticsearch:9200}
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME:-elastic}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-admin12345}
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    networks:
+      - shared_network
+    restart: always
+    labels:
+      - "traefik.enable=false"
+    volumes:
+      - ./logs:/app/logs
+    working_dir: /app
+    command: python /app/consumer.py
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  elasticsearch_api:
+    build: .
+    container_name: elasticsearch_api
+    env_file:
+      - .env
+    environment:
+      - ELASTIC_HOST=${ELASTIC_HOST:-http://elasticsearch:9200}
+      - ELASTIC_USERNAME=${ELASTIC_USERNAME:-elastic}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    networks:
+      - shared_network
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elasticsearch-api.rule=Host(`elasticsearch-api.localhost`)"
+      - "traefik.http.routers.elasticsearch-api.entrypoints=web"
+      - "traefik.http.services.elasticsearch-api.loadbalancer.server.port=8000"
+    volumes:
+      - ./logs:/app/logs
+    working_dir: /app
+    entrypoint: []
+    command: ["uvicorn", "elastic.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  shared_network:
+    external: true
