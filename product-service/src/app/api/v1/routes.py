@@ -20,6 +20,9 @@ from src.app.schemas.v1.product import ProductCreate, Product
 from src.app.schemas.v1.product_variation import ProductVariationCreate, ProductVariation
 from src.app.schemas.v1.product_image import ProductImageCreate, ProductImage
 from src.app.schemas.v1.comment import CommentCreate, Comment
+from src.app.publisher import rabbitmq_publisher
+
+
 
 router = APIRouter()
 
@@ -62,7 +65,6 @@ def delete_category(category_id: UUID, db: Session = Depends(get_db)):
     return {"message": "Category deleted"}
 
 # Endpoints for Product
-# Endpoints for Product
 @router.post("/products/", response_model=Product)
 async def create_product(product: ProductCreate, request: Request, db: Session = Depends(get_db)):
     user_id = request.headers.get('x-user-id')
@@ -80,6 +82,20 @@ async def create_product(product: ProductCreate, request: Request, db: Session =
     repo = ProductRepository(db)
     try:
         result = repo.create_with_categories(product, shop_id)
+        # Publish product created event to RabbitMQ
+        product_dict = {
+            'id': result.id,
+            'shop_id': result.shop_id,
+            'title': result.title,
+            'about': result.about,
+            'on_sale': result.on_sale,
+            'is_active': result.is_active,
+            'top_sale': result.top_sale,
+            'top_popular': result.top_popular,
+            'sku': result.sku,
+            'created_at': result.created_at,
+        }
+        rabbitmq_publisher.publish_product_created(product_dict)
         return result
     except ValueError as e:
         raise HTTPException(
@@ -109,6 +125,20 @@ def update_product(product_id: UUID, product: ProductCreate, request: Request, d
     updated_product = repo.update(product_id, product)
     if not updated_product:
         raise HTTPException(status_code=404, detail="Product not found")
+    # Publish product updated event to RabbitMQ
+    product_dict = {
+        'id': updated_product.id,
+        'shop_id': updated_product.shop_id,
+        'title': updated_product.title,
+        'about': updated_product.about,
+        'on_sale': updated_product.on_sale,
+        'is_active': updated_product.is_active,
+        'top_sale': updated_product.top_sale,
+        'top_popular': updated_product.top_popular,
+        'sku': updated_product.sku,
+        'created_at': updated_product.created_at,
+    }
+    rabbitmq_publisher.publish_product_updated(product_dict)
     return updated_product
         
 @router.patch("/products/{product_id}", response_model=Product)
@@ -127,6 +157,21 @@ async def partial_update_product(product_id: UUID, product_data: dict, request: 
         raise HTTPException(status_code=403, detail="You can only update your own products")
     
     updated_product = repo.update(product_id, product_data)
+    # Publish product updated event to RabbitMQ
+    if updated_product:
+        product_dict = {
+            'id': updated_product.id,
+            'shop_id': updated_product.shop_id,
+            'title': updated_product.title,
+            'about': updated_product.about,
+            'on_sale': updated_product.on_sale,
+            'is_active': updated_product.is_active,
+            'top_sale': updated_product.top_sale,
+            'top_popular': updated_product.top_popular,
+            'sku': updated_product.sku,
+            'created_at': updated_product.created_at,
+        }
+        rabbitmq_publisher.publish_product_updated(product_dict)
     return updated_product
 
 
@@ -135,6 +180,8 @@ def delete_product(product_id: UUID, db: Session = Depends(get_db)):
     repo = ProductRepository(db)
     if not repo.delete(product_id):
         raise HTTPException(status_code=404, detail="Product not found")
+    # Publish product deleted event to RabbitMQ
+    rabbitmq_publisher.publish_product_deleted(product_id)
     return {"message": "Product deleted"}
 
 
@@ -142,7 +189,8 @@ def delete_product(product_id: UUID, db: Session = Depends(get_db)):
 @router.post("/products/{product_id}/variations/", response_model=ProductVariation)
 def create_product_variation(product_id: UUID, variation: ProductVariationCreate, db: Session = Depends(get_db)): # Can be eliminated(product_id)
     repo = ProductVariationRepository(db)
-    return repo.create(variation)
+    result = repo.create(variation)
+    return result
 
 
 @router.get("/products/{product_id}/variations/", response_model=List[ProductVariation])
@@ -172,7 +220,10 @@ def update_product_variation(variation_id: UUID, variation: ProductVariationCrea
 @router.delete("/products/variations/{variation_id}")
 def delete_product_variation(variation_id: UUID, db: Session = Depends(get_db)):
     repo = ProductVariationRepository(db)
-    if not repo.delete(variation_id) or not repo.get(variation_id):
+    variation = repo.get(variation_id)
+    if not variation:
+        raise HTTPException(status_code=404, detail="Variation not found")
+    if not repo.delete(variation_id):
         raise HTTPException(status_code=404, detail="Variation not found")
     return {"message": "Variation deleted"}
 

@@ -22,6 +22,16 @@ from shop_service.messaging import publisher
 logger = logging.getLogger('shop_service')
 
 
+def querydict_to_dict(querydict):
+    """Convert QueryDict to regular dict while preserving file objects.
+    This avoids the deepcopy error when copying QueryDict with file uploads.
+    """
+    result = {}
+    for key in querydict.keys():
+        result[key] = querydict.get(key)
+    return result
+
+
 __all__ = [
     'ShopListAPIView',
     'ShopDetailWithSlugAPIView',
@@ -127,7 +137,7 @@ class ShopCreateAPIView(APIView):
             logger.warning(f"POST /create/ - User {user.id} already has a shop")
             return Response({'error': 'You already have Shop'}, status=status.HTTP_400_BAD_REQUEST)
 
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user.id)  
         serializer = ShopCreateUpdateSerializer(data=data)
         if serializer.is_valid():
@@ -154,13 +164,32 @@ class ShopManagementAPIView(APIView):
         parameters=[
             OpenApiParameter(name='shop_slug', type=OpenApiTypes.STR, location=OpenApiParameter.PATH, description='Shop slug')
         ],
-        request=ShopCreateUpdateSerializer,
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'name': {
+                        'type': 'string',
+                        'description': 'Shop name'
+                    },
+                    'about': {
+                        'type': 'string',
+                        'description': 'Shop description'
+                    },
+                    'profile': {
+                        'type': 'string',
+                        'format': 'binary',
+                        'description': 'Shop profile image (optional)'
+                    }
+                }
+            }
+        },
         responses={200: ShopCreateUpdateSerializer, 400: None, 403: None}
     )
     def patch(self, request, shop_slug):
         user = request.user
         logger.info(f"PATCH /shops/{shop_slug}/management/ - Update request from user {user.id}")
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
         if str(shop.user) != str(user.id):
@@ -267,7 +296,7 @@ class CreateShopBranchAPIView(APIView):
     def post(self, request, shop_slug):
         user = request.user
         logger.info(f"POST /branches/{shop_slug}/create/ - Branch creation request from user {user.id}")
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
@@ -383,7 +412,7 @@ class CreateShopCommentAPIView(APIView):
     def post(self, request, shop_slug):
         user_id = request.user.id
         logger.info(f"POST /comments/{shop_slug}/create/ - Comment creation request from user {user_id}")
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user_id)   
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
 
@@ -515,7 +544,7 @@ class CreateShopMediaAPIView(APIView):
     def post(self, request, shop_slug):
         user = request.user
         logger.info(f"POST /media/{shop_slug}/create/ - Media creation request from user {user.id}")
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
@@ -613,7 +642,7 @@ class CreateShopSocialMediaAPIView(APIView):
     def post(self, request, shop_slug):
         user = request.user
         logger.info(f"POST /social-media/{shop_slug}/create/ - Social media creation request from user {user.id}")
-        data = request.data.copy()  
+        data = querydict_to_dict(request.data)
         data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
@@ -701,7 +730,12 @@ class ShopOrderItemListAPIView(APIView):
     pagination_class = CustomPagination
 
     def get(self, request, shop_slug):
+        user = request.user
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True)
+        if str(shop.user) != str(request.user.id):
+            logger.warning(f"GET /shop-order-items/{shop.id} - Permission denied for user {user.id}")
+            return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
+        
         pagination = self.pagination_class()
         order_items = ShopOrderItem.objects.filter(shop=shop)
         paginated_items = pagination.paginate_queryset(order_items, request)
@@ -721,7 +755,12 @@ class ShopOrderItemDetailAPIView(APIView):
     authentication_classes = [GatewayHeaderAuthentication]
 
     def get(self, request, order_item_id):
+        user = request.user
         order_item = get_object_or_404(ShopOrderItem, id=order_item_id)
+        if str(order_item.shop.user) != str(request.user.id):
+            logger.warning(f"GET /order-item/{order_item.shop.id} - Permission denied for user {user.id}")
+            return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = ShopOrderItemSerializer(order_item)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -746,6 +785,10 @@ class ShopOrderItemStatusUpdateAPIView(APIView):
     def patch(self, request, order_item_id):
         user = request.user
         order_item = get_object_or_404(ShopOrderItem, id=order_item_id)
+        if str(order_item.shop.user) != str(request.user.id):
+            logger.warning(f"PATCH /order-item/{order_item.shop.id} - Permission denied for user {user.id}")
+            return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = ShopOrderItemStatusUpdateSerializer(order_item, data=request.data, partial=True)
         if serializer.is_valid():
             new_status = serializer.validated_data.get('status')

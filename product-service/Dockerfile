@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir uv
 
 # Install project dependencies into .venv
+# Increase timeout for large package downloads
+ENV UV_HTTP_TIMEOUT=120
 RUN uv sync --frozen --no-dev
 
 # Copy project code

@@ -9,7 +9,7 @@ logger = logging.getLogger('shop_service')
 class OrderServiceClient:
     def __init__(self):
         self.base_url = os.getenv('ORDER_SERVICE')
-        self.timeout = 10.0  # Reduced timeout for faster failure detection
+        self.timeout = 30.0  # Increased timeout to allow for order processing
         
     def update_order_item_status(self, order_item_id: int, status: int, shop_owner_user_id: str) -> Optional[Dict[str, Any]]:
         """

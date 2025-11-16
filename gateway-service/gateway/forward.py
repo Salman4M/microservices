@@ -6,7 +6,6 @@ from .services import SERVICE_URLS
 from .logging import logger
 
 
-# Constants
 EXCLUDED_REQUEST_HEADERS = {'host', 'connection', 'content-length', 'accept-encoding', 'cookie', 'referer'}
 EXCLUDED_RESPONSE_HEADERS = {'content-encoding', 'transfer-encoding', 'connection'}
 DEFAULT_TIMEOUT = 30.0
@@ -16,20 +15,25 @@ async def forward_request(service: str, path: str, request):
     if service not in SERVICE_URLS:
         return JSONResponse({'error': 'Unknown service'}, status_code=400)
 
-  
-    url = f'{SERVICE_URLS[service].rstrip('/')}/{path.lstrip('/')}'
+    url = f'{SERVICE_URLS[service].rstrip("/")}/{path.lstrip("/")}'
     headers = _prepare_headers(request, service)
     body = await request.body()
-    
+
     logger.info(f"Forwarding request to {url} | Method: {request.method}")
 
     try:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT, verify=False) as client:
-            resp = await client.request(request.method, url, headers=headers, content=body)
+            resp = await client.request(
+                request.method,
+                url,
+                headers=headers,
+                content=body,
+                params=request.query_params
+            )
 
         resp_headers = {k: v for k, v in resp.headers.items() 
                        if k.lower() not in EXCLUDED_RESPONSE_HEADERS}
-        
+
         logger.info(f'Received {resp.status_code} from {url}')
 
         return Response(
@@ -45,7 +49,6 @@ async def forward_request(service: str, path: str, request):
     except Exception as e:
         logger.error(f'Unexpected error: {e}')
         return JSONResponse({'error': str(e)}, status_code=500)
-
 
 def _prepare_headers(request, service: str):
     headers = {k.lower(): v for k, v in request.headers.items() 
@@ -70,5 +73,5 @@ def _prepare_headers(request, service: str):
 
     parsed = urlparse(SERVICE_URLS[service])
     headers['host'] = parsed.netloc
-    
+
     return headers

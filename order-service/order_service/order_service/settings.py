@@ -170,7 +170,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # RestFramework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'order_service.authentication.GatewayHeaderAuthentication',
+        #### commented in the last commit
+    'order_service.authentication.GatewayHeaderAuthentication',
+        ####
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }

@@ -56,6 +56,10 @@ PUBLIC_ENDPOINTS = {
     '/product/api/products/variations/{variation_id}': ['GET'],
     '/product/api/products/variations/{variation_id}/images/': ['GET'],
     '/product/api/products/variations/{variation_id}/comments/': ['GET'],
+
+    # Elasticsearch endpoints
+    '/elasticsearch/api/elasticsearch/search/': ['GET'],
+    '/elasticsearch/api/elasticsearch/shop/{shop_id}/products/': ['GET']
 }
 
 
@@ -115,11 +119,13 @@ async def verify_jwt(request: Request):
         )
     
     token = auth_header.split(" ")[1]
+
     try:
         if is_token_blacklisted(token):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked (logged out).")
     except Exception as e:
         logger.error(f"Blacklist check failed: {e}")
+    
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         request.state.user = payload  
@@ -130,6 +136,8 @@ async def verify_jwt(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token is invalid or expired."
         )
+    
+    
 
 
 async def handle_login(request):

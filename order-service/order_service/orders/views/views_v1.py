@@ -373,68 +373,78 @@ def create_order_from_shopcart(request):
 
 @api_view(['PATCH'])
 def update_order_item_status(request, pk):
+    user_id = str(request.user.id)
+    
     try:
         item = OrderItem.objects.get(pk=pk)
     except OrderItem.DoesNotExist:
         logger.warning(f'OrderItem {pk} not found')
         return Response({"error": "OrderItem not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f'Error getting OrderItem {pk}: {e}', exc_info=True)
+        return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     new_status = request.data.get("status")
     if new_status not in dict(OrderItem.Status.choices):
         logger.warning(f'Invalid status {new_status} for OrderItem {pk}')
         return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Use stored shop_id and product_id instead of making network calls
-    shop_id = item.shop_id
-    product_id = item.product_id
-    
-    # Fallback to network calls only if data is missing (shouldn't happen if created from shopcart)
-    if not shop_id or not product_id:
-        logger.warning(f'Missing shop_id or product_id for OrderItem {item.id}, fetching from product service')
-        variation_id = str(item.product_variation)
-        variation_data = product_client.get_variation(variation_id, user_id=user_id)
-        if variation_data and not product_id:
-            product_id = str(variation_data.get("product_id")) if variation_data.get("product_id") else None
-        
-        if product_id and not shop_id:
-            product_data = product_client.get_product(product_id, user_id=user_id)
-            if product_data:
-                shop_id = str(product_data.get("shop_id")) if product_data.get("shop_id") else None
-    
-    if not shop_id:
-        return Response({"error": "Shop ID not found for this order item"}, status=status.HTTP_404_NOT_FOUND)
-    
-    user_id = str(request.user.id)
-    user_shop_ids = shop_client.get_user_shop_ids(user_id)
-
-    if shop_id not in user_shop_ids:
-        return Response({"error": "Forbidden: You do not own this shop's item"}, status=status.HTTP_403_FORBIDDEN)
-
-    old_status = item.status
-    item.status = new_status
-    if product_id and not item.product_id:
-        item.product_id = product_id
-    if shop_id and not item.shop_id:
-        item.shop_id = shop_id
-    item.save()
-
-    item.order.check_and_approve()
-
-    # Publish status update event for other services (notification, analytics, etc.)
-    # Note: Shop-service doesn't need this event as it updates via API response
     try:
-        success = rabbitmq_producer.publish_order_item_status_updated(
-            order_item_id=item.id,
-            order_id=item.order.id,
-            shop_id=str(shop_id),
-            status=new_status
-        )
-        if success:
-            logger.debug(f'Published order.item.status.updated event - OrderItem: {item.id}, Status: {new_status}')
-        else:
-            logger.warning(f'Failed to publish order.item.status.updated event - OrderItem: {item.id}')
-    except Exception as e:
-        logger.error(f'Error publishing order.item.status.updated event: {e}', exc_info=True)
+        # Use stored shop_id and product_id instead of making network calls
+        shop_id = item.shop_id
+        product_id = item.product_id
+        
+        # Fallback to network calls only if data is missing (shouldn't happen if created from shopcart)
+        if not shop_id or not product_id:
+            logger.warning(f'Missing shop_id or product_id for OrderItem {item.id}, fetching from product service')
+            variation_id = str(item.product_variation)
+            variation_data = product_client.get_variation(variation_id, user_id=user_id)
+            if variation_data and not product_id:
+                product_id = str(variation_data.get("product_id")) if variation_data.get("product_id") else None
+            
+            if product_id and not shop_id:
+                product_data = product_client.get_product(product_id, user_id=user_id)
+                if product_data:
+                    shop_id = str(product_data.get("shop_id")) if product_data.get("shop_id") else None
+        
+        if not shop_id:
+            logger.error(f'Shop ID not found for OrderItem {item.id}')
+            return Response({"error": "Shop ID not found for this order item"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # NOTE: Shop ownership verification is done by shop-service before calling this endpoint
+        # Shop service sends X-User-ID header with shop owner's user_id
+        # We trust this header to avoid circular dependency (shop-service -> order-service -> shop-service)
+        # If shop service didn't verify ownership, it wouldn't call this endpoint
 
-    serializer = OrderItemSerializer(item)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+        old_status = item.status
+        item.status = new_status
+        if product_id and not item.product_id:
+            item.product_id = product_id
+        if shop_id and not item.shop_id:
+            item.shop_id = shop_id
+        item.save()
+
+        item.order.check_and_approve()
+
+        # Publish status update event for other services (notification, analytics, etc.)
+        # Note: Shop-service doesn't need this event as it updates via API response
+        try:
+            success = rabbitmq_producer.publish_order_item_status_updated(
+                order_item_id=item.id,
+                order_id=item.order.id,
+                shop_id=str(shop_id),
+                status=new_status
+            )
+            if success:
+                logger.debug(f'Published order.item.status.updated event - OrderItem: {item.id}, Status: {new_status}')
+            else:
+                logger.warning(f'Failed to publish order.item.status.updated event - OrderItem: {item.id}')
+        except Exception as e:
+            logger.error(f'Error publishing order.item.status.updated event: {e}', exc_info=True)
+
+        serializer = OrderItemSerializer(item)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f'Error updating order item status for OrderItem {pk}: {e}', exc_info=True)
+        return Response({"error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

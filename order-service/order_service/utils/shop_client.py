@@ -1,6 +1,6 @@
 import httpx
 import os
-from typing import List
+from typing import List, Optional
 from rest_framework.exceptions import APIException
 from dotenv import load_dotenv
 
@@ -13,6 +13,40 @@ class ShopServiceClient:
     def __init__(self):
         self.base_url = SHOP_SERVICE
         self.timeout = 30.0
+
+    def get_shop_owner_user_id(self, shop_id: str) -> Optional[str]:
+        """Get the user_id (owner) of a shop by shop_id"""
+        if not self.base_url:
+            raise APIException('Shop Service configuration missing')
+
+        url = f'{self.base_url}/api/shops/{shop_id}/'
+        try:
+            headers = {
+                'Content-Type': 'application/json',
+            }
+            
+            with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
+                response = client.get(
+                    url,
+                    headers=headers
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                # ShopDetailSerializer doesn't return user field, so we need to check if it exists
+                # If not, we'll use the alternative method
+                user_id = data.get('user')
+                if user_id:
+                    return str(user_id)
+                return None
+            elif response.status_code == 404:
+                return None
+            else:
+                raise APIException(f'Shop Service error: {response.status_code}')
+        except httpx.RequestError as e:
+            raise APIException(f'Failed to connect to Shop Service: {str(e)}')
+        except Exception as e:
+            raise
 
     def get_user_shop_ids(self, user_id: str) -> List[str]:
         if not self.base_url:

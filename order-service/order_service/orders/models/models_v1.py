@@ -19,10 +19,12 @@ class Order(models.Model):
         if items.exists() and all(item.status in [3, 4] for item in items):
             self.is_approved = True
             self.save()
+            ###this part is commented in the last version but we keep it same for now
             try:
                 analytic_client.send_order(self)
             except Exception as e:
                 logger.error(f"Error while sending order {self.id} to analytics: {str(e)}")
+            #####
             
     class Meta:
         db_table = "orders"
