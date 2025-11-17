@@ -1,68 +1,21 @@
 #!/bin/bash
 
-# Stop Traefik first
-echo "Stoping Traefik..."
-cd traefik-service
-docker-compose down
-cd ..
+# Simple Stop Script - Stops all services safely
 
-# Wait for Traefik to be ready
-echo "Waiting for Traefik to stop..."
-sleep 5
-
-# Stop infrastructure services
-echo "Stoping Redis..."
-cd redis-service
-docker-compose down
-cd ..
-
-echo "Stoping RabbitMQ..."
-cd rabbitmq-service
-docker-compose down
-cd ..
-
-# Stop Gateway
-echo "Stoping Gateway Service..."
-cd gateway-service
-docker-compose down
-cd ..
-
-
-# Stop ElasticSearch
-echo "Stoping ElasticSearch Service..."
-cd elasticsearch-service
-docker-compose down
-cd ..
-
-# Stop backend services
-echo "Stoping User Service..."
-cd user-service
-docker-compose down
-cd ..
-
-echo "Stoping Shop Service..."
-cd shop-service
-docker-compose down
-cd ..
-
-echo "Stoping Product Service..."
-cd product-service
-docker-compose down
-cd ..
-
-echo "Stoping Order Service..."
-cd order-service
-docker-compose down
-cd ..
-
-echo "Stoping ShopCart Service..."
-cd shopcart-service
-docker-compose down
-cd ..
-
-echo "All services stopped!"
+echo "Stopping services..."
 echo ""
-# echo "Access points:"
-# echo "- Traefik Dashboard: http://traefik.localhost:8080"
-# echo "- API Gateway: http://api.localhost"
-# echo "- Direct Gateway: http://localhost:8002"
+
+# Stop in reverse order
+cd traefik-service 2>/dev/null && docker-compose down && cd .. || echo "Traefik not found"
+cd gateway-service 2>/dev/null && docker-compose down && cd .. || echo "Gateway not found"
+cd elasticsearch-service 2>/dev/null && docker-compose down && cd .. || echo "Elasticsearch not found"
+cd product-service 2>/dev/null && docker-compose down && cd .. || echo "Product not found"
+cd shop-service 2>/dev/null && docker-compose down && cd .. || echo "Shop not found"
+cd user-service 2>/dev/null && docker-compose down && cd .. || echo "User not found"
+cd order-service 2>/dev/null && docker-compose down && cd .. || echo "Order not found"
+cd shopcart-service 2>/dev/null && docker-compose down && cd .. || echo "ShopCart not found"
+cd rabbitmq-service 2>/dev/null && docker-compose down && cd .. || echo "RabbitMQ not found"
+cd redis-service 2>/dev/null && docker-compose down && cd .. || echo "Redis not found"
+
+echo ""
+echo "All services stopped!"

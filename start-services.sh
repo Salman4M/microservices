@@ -1,71 +1,48 @@
 #!/bin/bash
 
-# Create shared network if not exists
-docker network create shared_network 2>/dev/null || true
+# Start all services
 
-# Start Traefik first
-echo "Starting Traefik..."
-cd traefik-service
-docker-compose up -d
-cd ..
+echo "Starting services..."
+echo ""
 
-# Wait for Traefik to be ready
-echo "Waiting for Traefik to start..."
+# Ensure network exists
+docker network create shared_network 2>/dev/null || echo "Network exists"
+echo ""
+
+# Start in order
+cd redis-service 2>/dev/null && docker-compose up -d && cd .. || echo "Redis not found"
+sleep 3
+
+cd rabbitmq-service 2>/dev/null && docker-compose up -d && cd .. || echo "RabbitMQ not found"
 sleep 5
 
-# Start infrastructure services
-echo "Starting Redis..."
-cd redis-service
-docker-compose up -d
-cd ..
+cd traefik-service 2>/dev/null && docker-compose up -d && cd .. || echo "Traefik not found"
+sleep 3
 
-echo "Starting RabbitMQ..."
-cd rabbitmq-service
-docker-compose up -d
-cd ..
+cd elasticsearch-service 2>/dev/null && docker-compose up -d && cd .. || echo "Elasticsearch not found"
+sleep 10
 
-# Start Gateway
-echo "Starting Gateway Service..."
-cd gateway-service
-docker-compose up -d
-cd ..
+cd user-service 2>/dev/null && docker-compose up -d && cd .. || echo "User not found"
+sleep 3
 
-# Start ElasticSearch
-echo "Starting ElasticSearch Service..."
-cd elasticsearch-service
-docker-compose up -d
-cd ..
+cd shop-service 2>/dev/null && docker-compose up -d && cd .. || echo "Shop not found"
+sleep 3
 
+cd product-service 2>/dev/null && docker-compose up -d && cd .. || echo "Product not found"
+sleep 5
 
-# Start backend services
-echo "Starting User Service..."
-cd user-service
-docker-compose up -d
-cd ..
+cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
+sleep 3
 
-echo "Starting Shop Service..."
-cd shop-service
-docker-compose up -d
-cd ..
+cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
+sleep 3
 
-echo "Starting Product Service..."
-cd product-service
-docker-compose up -d
-cd ..
+cd gateway-service 2>/dev/null && docker-compose up -d && cd .. || echo "Gateway not found"
+sleep 5
 
-echo "Starting Order Service..."
-cd order-service
-docker-compose up -d
-cd ..
-
-echo "Starting ShopCart Service..."
-cd shopcart-service
-docker-compose up -d
-cd ..
-
+echo ""
 echo "All services started!"
 echo ""
-echo "Access points:"
-echo "- Traefik Dashboard: http://traefik.localhost:8080"
-echo "- API Gateway: http://api.localhost"
-echo "- Direct Gateway: http://localhost:8002"
+echo "URLs:"
+echo "  Gateway: http://gateway.localhost/docs"
+echo "  Elasticsearch: http://elasticsearch-api.localhost/docs"
