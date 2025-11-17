@@ -190,7 +190,7 @@ def create_order_from_shopcart(request):
             })
             continue
         
-        # ✅ CRITICAL: Validate stock availability
+        # Validate stock availability
         available_stock = variation_data.get('amount', 0)
         
         # Case 1: Out of stock

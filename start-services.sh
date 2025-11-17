@@ -30,6 +30,13 @@ cd gateway-service
 docker-compose up -d
 cd ..
 
+# Start ElasticSearch
+echo "Starting ElasticSearch Service..."
+cd elasticsearch-service
+docker-compose up -d
+cd ..
+
+
 # Start backend services
 echo "Starting User Service..."
 cd user-service

@@ -2,11 +2,11 @@ import os
 import json
 import pika
 import aio_pika
-from .documents import ELASTIC, INDEX_NAME
-from .logging_config import get_logger
+from elastic.documents import ELASTIC, INDEX_NAME
+from elastic.logging_config import get_logger
 from dotenv import load_dotenv
 
-from .models import ShopSchema
+from elastic.models import ShopSchema
 
 load_dotenv('')
 

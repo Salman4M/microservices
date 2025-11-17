@@ -21,13 +21,20 @@ cd rabbitmq-service
 docker-compose down
 cd ..
 
-# Start Gateway
+# Stop Gateway
 echo "Stoping Gateway Service..."
 cd gateway-service
 docker-compose down
 cd ..
 
-# Start backend services
+
+# Stop ElasticSearch
+echo "Stoping ElasticSearch Service..."
+cd elasticsearch-service
+docker-compose down
+cd ..
+
+# Stop backend services
 echo "Stoping User Service..."
 cd user-service
 docker-compose down
