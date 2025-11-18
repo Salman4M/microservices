@@ -1,6 +1,6 @@
 # Virtual environments
 .venv/
-
+shopcart_service.egg-info/
 
 # Env files
 .env
