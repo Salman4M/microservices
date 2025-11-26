@@ -201,7 +201,7 @@ class TestDeleteCartItem:
         # Verify item is deleted
         cart_after = crud.get_cart(db_session, user_uuid)
         assert len(cart_after.items) == 0
-    
+        
     def test_delete_nonexistent_item(self, db_session):
         """Test deleting non-existent item returns None"""
         user_uuid = uuid4()

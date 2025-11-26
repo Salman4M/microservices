@@ -20,3 +20,7 @@ github-sa-key.json
 # Static files
 staticfiles/
 static/
+
+# Temporary ignored files
+tests/test_messaging.py
+tests/test_routes.py

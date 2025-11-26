@@ -19,8 +19,8 @@ sleep 5
 cd traefik-service 2>/dev/null && docker-compose up -d && cd .. || echo "Traefik not found"
 sleep 3
 
-cd elasticsearch-service 2>/dev/null && docker-compose up -d && cd .. || echo "Elasticsearch not found"
-sleep 10
+# cd elasticsearch-service 2>/dev/null && docker-compose up -d && cd .. || echo "Elasticsearch not found"
+# sleep 10
 
 cd user-service 2>/dev/null && docker-compose up -d && cd .. || echo "User not found"
 sleep 3

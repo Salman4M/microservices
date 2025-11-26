@@ -19,7 +19,7 @@ class ShopCartServiceDataCheck:
         self.timeout = 30.0
     
     def get_shopcart_data(self, user_uuid: str) -> Optional[dict]:
-        url = f'{self.base_url}/shopcart/api/mycart/'
+        url = f'{self.base_url}/api/mycart/'
         
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
@@ -51,7 +51,7 @@ class ShopCartServiceDataCheck:
     
     def update_cart_item(self, cart_item_id: int, quantity: int, user_id: str) -> bool:
         """Update cart item quantity"""
-        url = f'{self.base_url}/shopcart/api/items/{cart_item_id}'
+        url = f'{self.base_url}/api/items/{cart_item_id}'
         
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
@@ -77,7 +77,7 @@ class ShopCartServiceDataCheck:
     
     def delete_cart_item(self, cart_item_id: int, user_id: str) -> bool:
         """Delete cart item"""
-        url = f'{self.base_url}/shopcart/api/items/{cart_item_id}'
+        url = f'{self.base_url}/api/items/{cart_item_id}'
         
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:

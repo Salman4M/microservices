@@ -23,7 +23,7 @@ services:
     
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gateway.rule=Host(`gateway.localhost`)"
+      - "traefik.http.routers.gateway.rule=PathPrefix(`/`)"
       - "traefik.http.routers.gateway.entrypoints=web"
       - "traefik.http.services.gateway.loadbalancer.server.port=8080"
     logging:

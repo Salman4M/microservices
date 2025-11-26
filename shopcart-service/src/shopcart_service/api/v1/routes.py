@@ -14,7 +14,7 @@ product_client = ProductServiceDataCheck()
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/shopcart/api", tags=["Cart"])
+router = APIRouter(prefix="/api", tags=["Cart"])
 
 def get_user_id(user_id: str = Header(None, alias="X-User-Id", include_in_schema=False)):
     """Extract user ID from X-User-Id header"""
@@ -57,7 +57,7 @@ def create_cart(user_uuid: str = Depends(get_user_id), db: Session = Depends(db.
 
 
 
-@router.get("/mycart", response_model=schemas.ShopCartRead)
+@router.get("/mycart/", response_model=schemas.ShopCartRead)
 def get_cart(user_uuid: str = Depends(get_user_id), db: Session = Depends(db.get_db)):
     cart = crud.get_cart(db, user_uuid)
     if not cart:
