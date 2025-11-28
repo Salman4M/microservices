@@ -7,8 +7,12 @@ services:
     restart: always
     depends_on:
       - db
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
     volumes:
       - ./src:/app/src:rw
     command: >
@@ -56,6 +60,23 @@ services:
       - internal_net
       - shared_network
     restart: unless-stopped
+
+  celery_beat:
+    build: .
+    container_name: product_celery_beat
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/mydb
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+    command: >
+      sh -c ". .venv/bin/activate && celery -A src.app.celery_app.celery beat --loglevel=info"
+    depends_on:
+      - db
+    networks:
+      - internal_net
+      - shared_network
 
 networks:
   internal_net:

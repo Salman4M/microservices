@@ -38,11 +38,16 @@ class ProductServiceDataCheck:
                 data = response.json()
                 
                 # Check if product is active
-                if not data.get('product', {}).get('is_active'):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Product unavailable"
-                    )
+                # if not data.get('product', {}).get('is_active'):
+                #     raise HTTPException(
+                #         status_code=400,
+                #         detail="Product unavailable"
+                #     )
+                product = data.get("product")
+
+                if product is not None:
+                    if not product.get("is_active", True):
+                        raise HTTPException(400, "Product unavailable")
                 
                 return data
                     

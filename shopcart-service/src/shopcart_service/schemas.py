@@ -4,16 +4,16 @@ from typing import List, Optional
 from pydantic import UUID4
 
 
-class CartItemBase(BaseModel):
-    quantity: int = 1
+# class CartItemBase(BaseModel):
+#     quantity: int = 1
 
 class CartItemCreate(BaseModel):
     pass
 
-class CartItemRead(CartItemBase):
+class CartItemRead(BaseModel):
     id: int
     product_variation_id: UUID4
-    quantity: int
+    quantity: int = 1
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -29,7 +29,7 @@ class ShopCartCreate(ShopCartBase):
 
 
 class CartItemUpdate(BaseModel):
-    quantity: int
+    quantity: int = 1
 
 class ShopCartRead(ShopCartBase):
     id: int
