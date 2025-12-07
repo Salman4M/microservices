@@ -1,5 +1,7 @@
 import logging
-from django.db.models.signals import pre_save, post_delete
+from django.db.models.signals import pre_save, post_delete, post_save
+from django.core.cache import cache
+
 from django.dispatch import receiver
 from .models import Shop
 from .serializers import ShopDetailSerializer
@@ -49,3 +51,10 @@ def shop_post_delete(sender, instance, **kwargs):
         logger.info(f"Shop deleted event published | user={instance.user} shop={instance.id}")
     except Exception as e:
         logger.error(f"Failed to publish shop deleted event: {e}", exc_info=True)
+
+
+
+# Cache signals
+@receiver([post_save, post_delete], sender=Shop)
+def clear_shop_cache(sender, **kwargs):
+    cache.clear()

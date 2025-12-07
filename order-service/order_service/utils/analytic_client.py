@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-ANALYTIC_SERVICE = os.getenv('ANALYTIC_SERVICE')
+ANALYTIC_SERVICE = os.getenv('ANALYTIC_SERVICE') or settings.SERVICE_URLS.get('analytic')
 
 
 class AnalyticServiceClient:
@@ -28,14 +28,28 @@ class AnalyticServiceClient:
             'id', 'order_id', 'quantity', 'product_variation', 'price'
         )
 
+        # Convert items to proper format
+        items_list = []
+        for item in order_items:
+            item_data = {
+                'id': str(item['id']),  # Convert integer to string
+                'quantity': item['quantity'],
+                'product_variation': item['product_variation'],
+                'price': float(item['price']) / 100.0 if item['price'] else 0.0,  # Convert from qepik to currency
+            }
+            items_list.append(item_data)
+            logger.info(f"Order item {item['id']} prepared: variation_id={item['product_variation']}")
+
         payload = {
-            'order': order.id,
-            'user_id': order.user_id,
+            'id': str(order.id),  # Convert integer to string
+            'user_id': order.user_id,  # Already string (UUID format)
             'created_at': order.created_at.isoformat(),
-            'items': list(order_items),
+            'items': items_list,
         }
 
-        url = f"{self.base_url}/api/orders/"
+        logger.info(f"Sending order {order.id} to analytics with {len(items_list)} items (only product_variation_id, shop_id/product_id will be fetched by analytics from product service)")
+
+        url = f"{self.base_url}/api/analitic-order-completed/"
         try:
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 response = client.post(url, json=payload)

@@ -162,10 +162,12 @@ class ShopMediaSerializer(serializers.ModelSerializer):
 
 
 class ShopSocialMediaSerializer(serializers.ModelSerializer):
+    shop = serializers.PrimaryKeyRelatedField(read_only=True)
+
     class Meta:
         model = ShopSocialMedia
         fields = '__all__'
-    
+
     def create(self, validated_data):
         validated_data['shop'] = self.context.get('shop')
         return super().create(validated_data)
@@ -174,7 +176,7 @@ class ShopSocialMediaSerializer(serializers.ModelSerializer):
 class ShopOrderItemSerializer(serializers.ModelSerializer):
     shop = ShopListSerializer(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    
+
     class Meta:
         model = ShopOrderItem
         fields = [
@@ -209,8 +211,22 @@ class ShopOrderItemStatusUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ShopOrderItem
         fields = ['status']
-    
+
     def validate_status(self, value):
         if value not in dict(ShopOrderItem.Status.choices):
             raise serializers.ValidationError('Invalid status value')
         return value
+    
+    def validate(self, attrs):
+        extra_fields = set(attrs.keys()) - {'status'}
+        if extra_fields:
+            raise serializers.ValidationError(
+                f'Only status field can be updated. Invalid fields: {", ".join(extra_fields)}'
+            )
+        
+        # Check if the order item status is already DELIVERED (3)
+        if self.instance and self.instance.status == ShopOrderItem.Status.DELIVERED:
+            raise serializers.ValidationError(
+                {'status': 'Cannot update order item status. Order item is already delivered and cannot be modified.'}
+            )
+        return attrs

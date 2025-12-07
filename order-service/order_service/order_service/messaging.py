@@ -251,7 +251,6 @@ class RabbitMQPublisher:
             logger.error(f"⚠️ Error closing connection: {e}")
 
 
-# Global singleton instance
 rabbitmq_producer = RabbitMQPublisher()
 
 # class RabbitMQPublisher:

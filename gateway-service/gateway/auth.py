@@ -57,6 +57,7 @@ PUBLIC_ENDPOINTS = {
     '/product/api/products/variations/{variation_id}/images/': ['GET'],
     '/product/api/products/variations/{variation_id}/comments/': ['GET'],
 
+
     # Elasticsearch endpoints
     '/elasticsearch/api/elasticsearch/search/': ['GET'],
     '/elasticsearch/api/elasticsearch/shop/{shop_id}/products/': ['GET']
@@ -140,21 +141,87 @@ async def verify_jwt(request: Request):
     
 
 
+async def get_user_info(user_uuid: str) -> dict:
+    """Get user information from user service"""
+    try:
+        logger.info(f"Fetching user info for user: {user_uuid}")
+        async with httpx.AsyncClient() as client:
+            res = await client.get(
+                f'{SERVICE_URLS['user']}/api/user/profile/',
+                headers={'X-User-ID': str(user_uuid)}
+            )
+        if res.status_code == 200:
+            user_info = res.json()
+            logger.info(f"User info retrieved successfully for user: {user_uuid}, is_shop_owner: {user_info.get('is_shop_owner')}")
+            return user_info
+        logger.warning(f"Failed to get user info: status_code={res.status_code}, user={user_uuid}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to get user info: {e}")
+        return None
+
+
+async def get_shop_uuid_by_user(user_uuid: str) -> str:
+    """Get shop UUID from shop service by user UUID"""
+    try:
+        logger.info(f"Fetching shop UUID for user: {user_uuid}")
+        async with httpx.AsyncClient() as client:
+            res = await client.get(
+                f'{SERVICE_URLS['shop']}/api/user/{user_uuid}/'
+            )
+        if res.status_code == 200:
+            shop_data = res.json()
+            shop_uuid = shop_data.get('id')
+            logger.info(f"Shop UUID retrieved successfully: {shop_uuid} for user: {user_uuid}")
+            return shop_uuid
+        logger.warning(f"Failed to get shop UUID: status_code={res.status_code}, user={user_uuid}")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to get shop UUID: {e}")
+        return None
+
+
+async def create_tokens_with_shop(user_uuid: str) -> tuple:
+    """Create access and refresh tokens, including shop_uuid if user is shop owner"""
+    payload = {'sub': str(user_uuid)}
+    
+    user_info = await get_user_info(user_uuid)
+    if user_info and user_info.get('is_shop_owner'):
+        logger.info(f"User {user_uuid} is shop owner, fetching shop UUID")
+        shop_uuid = await get_shop_uuid_by_user(user_uuid)
+        if shop_uuid:
+            payload['shop_uuid'] = str(shop_uuid)
+            logger.info(f"Added shop_uuid {shop_uuid} to token for user {user_uuid}")
+        else:
+            logger.warning(f"User {user_uuid} is shop owner but shop UUID not found")
+    else:
+        logger.info(f"User {user_uuid} is not shop owner")
+    
+    access = create_access_token(payload.copy())
+    refresh = create_refresh_token(payload.copy())
+    logger.info(f"Tokens created successfully for user: {user_uuid}")
+    return access, refresh
+
+
 async def handle_login(request):
+    logger.info("Login request received")
     body = await request.json()
     async with httpx.AsyncClient() as client:
         res = await client.post(f'{SERVICE_URLS['user']}/api/user/login/', json=body)
 
     if res.status_code != 200:
+        logger.warning(f"Login failed: status_code={res.status_code}")
         return JSONResponse(res.json(), status_code=res.status_code)
 
     user = res.json()
     user_uuid = user.get('uuid')
     if not user_uuid:
+        logger.error("User UUID not returned from user service")
         return JSONResponse({'detail': 'User UUID not returned'}, status_code=500)
 
-    access = create_access_token({'sub': str(user_uuid)})
-    refresh = create_refresh_token({'sub': str(user_uuid)})
+    logger.info(f"Login successful for user: {user_uuid}, creating tokens with shop info")
+    access, refresh = await create_tokens_with_shop(user_uuid)
+    logger.info(f"Login completed successfully for user: {user_uuid}")
     return JSONResponse({
         'access_token': access,
         'refresh_token': refresh,
@@ -162,17 +229,54 @@ async def handle_login(request):
     })
 
 
+async def handle_refresh_token(request: Request):
+    """Handle refresh token request and create new tokens with shop_uuid if applicable"""
+    try:
+        body = await request.json()
+        refresh_token = body.get("refresh_token")
+        
+        if not refresh_token:
+            raise HTTPException(status_code=400, detail="Refresh token is required")
+        
+        if is_token_blacklisted(refresh_token):
+            raise HTTPException(status_code=401, detail="Refresh token has been revoked")
+        
+        try:
+            payload = jwt.decode(refresh_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            user_uuid = payload.get('sub')
+            
+            if not user_uuid:
+                raise HTTPException(status_code=400, detail="Invalid refresh token")
+            
+            add_to_blacklist(refresh_token)
+            access, refresh = await create_tokens_with_shop(user_uuid)
+            return JSONResponse({
+                'access_token': access,
+                'refresh_token': refresh,
+                'token_type': 'Bearer'
+            })
+            
+        except JWTError as e:
+            logger.warning(f"Invalid or expired refresh token: {e}")
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling refresh token: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 async def handle_logout(request: Request):
     auth_header = request.headers.get("Authorization")
     
-    # Parse body safely (optional)
     body = {}
     refresh_token = None
     try:
         body = await request.json()
         refresh_token = body.get("refresh_token")
     except Exception:
-        pass  # Body optional
+        pass
     
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authorization header missing or invalid")

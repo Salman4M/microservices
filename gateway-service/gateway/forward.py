@@ -1,4 +1,3 @@
-# gateway/forward.py
 import httpx
 from fastapi.responses import JSONResponse, Response
 from urllib.parse import urlparse
@@ -15,7 +14,13 @@ async def forward_request(service: str, path: str, request):
     if service not in SERVICE_URLS:
         return JSONResponse({'error': 'Unknown service'}, status_code=400)
 
-    url = f'{SERVICE_URLS[service].rstrip("/")}/{path.lstrip("/")}'
+    base_url = SERVICE_URLS[service].rstrip('/')
+    full_path = path.lstrip('/')
+    query_str = request.url.query
+    if query_str:
+        url = f"{base_url}/{full_path}?{query_str}"
+    else:
+        url = f"{base_url}/{full_path}"
     headers = _prepare_headers(request, service)
     body = await request.body()
 
@@ -68,6 +73,12 @@ def _prepare_headers(request, service: str):
             logger.info(f'Forwarding with X-User-ID: {user_id}')
         else:
             logger.warning('User ID not found in request.state.user')
+
+        shop_uuid = user.get('shop_uuid')
+        if shop_uuid:
+            headers['x-shop-id'] = str(shop_uuid)
+            logger.info(f'Forwarding with X-Shop-ID: {shop_uuid}')
+        
     else:
         logger.warning('No user in request.state, X-User-ID not set')
 

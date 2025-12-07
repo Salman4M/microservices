@@ -1,15 +1,19 @@
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import AllowAny  
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 import logging
+
 from order_service.messaging import rabbitmq_producer
 from utils.shopcart_client import shopcart_client
 from utils.product_client import product_client
 from utils.shop_client import shop_client
 from ..models import * 
 from ..serializers import *
+from order_service.authentication import GatewayHeaderAuthentication
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +34,20 @@ def orders_list_create(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    
+
 @api_view(['GET', 'PATCH', 'DELETE'])
+@authentication_classes([GatewayHeaderAuthentication])
+@permission_classes([IsAuthenticated]) 
 def orders_detail(request, pk):
     try:
         order = Order.objects.get(pk=pk)
     except Order.DoesNotExist:
         return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Ownership check - only order owner can access
+    if str(order.user_id) != str(request.user.id):
+        logger.warning(f"GET/PATCH/DELETE /orders/{pk} - Permission denied for user {request.user.id}, order belongs to user {order.user_id}")
+        return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
         serializer = OrderSerializer(order)
@@ -74,11 +85,17 @@ def orderitems_list_create(request):
 
 # GET / PATCH / DELETE /order-items/<id>/
 @api_view(['GET', 'PATCH', 'DELETE'])
+@authentication_classes([GatewayHeaderAuthentication])
+@permission_classes([IsAuthenticated])
 def orderitems_detail(request, pk):
     try:
-        item = OrderItem.objects.get(pk=pk)
+        item = OrderItem.objects.select_related('order').get(pk=pk)
     except OrderItem.DoesNotExist:
         return Response({"error": "OrderItem not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if str(item.order.user_id) != str(request.user.id):
+        logger.warning(f"GET/PATCH/DELETE /order-items/{pk} - Permission denied for user {request.user.id}, order belongs to user {item.order.user_id}")
+        return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
         serializer = OrderItemSerializer(item)
@@ -96,8 +113,6 @@ def orderitems_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 
-
-logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 def create_order_from_shopcart(request):
@@ -370,6 +385,7 @@ def create_order_from_shopcart(request):
         },
         status=status.HTTP_201_CREATED
     )
+
 
 @api_view(['PATCH'])
 def update_order_item_status(request, pk):

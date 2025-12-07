@@ -3,7 +3,7 @@ import json
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from .logging import logger
-from .auth import verify_jwt, is_endpoint_public, handle_login, handle_logout
+from .auth import verify_jwt, is_endpoint_public, handle_login, handle_logout,handle_refresh_token
 from .services import SERVICE_URLS
 
 
@@ -23,6 +23,9 @@ async def auth_middleware(request: Request, call_next):
 
     if path == '/user/api/user/login/' and request.method == 'POST':
         return await handle_login(request)
+    
+    if path == '/user/api/user/refresh/' and request.method == 'POST':
+        return await handle_refresh_token(request)
     
     if path == '/user/api/user/logout/' and request.method == 'POST':
         try:

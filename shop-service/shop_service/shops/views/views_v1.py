@@ -4,6 +4,7 @@ import logging
 from typing import List
 from django.conf import settings
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -34,7 +35,7 @@ def querydict_to_dict(querydict):
 
 __all__ = [
     'ShopListAPIView',
-    'ShopDetailWithSlugAPIView',
+    # 'ShopDetailWithSlugAPIView',
     'ShopDetailWithUuidAPIView',
     'ShopCreateAPIView',
     'ShopManagementAPIView',
@@ -59,6 +60,7 @@ __all__ = [
 ]
 
 # Shop Views
+@method_decorator(cache_page(60 * 10), name='get')
 class ShopListAPIView(APIView):
     """List all active shops with pagination."""
     http_method_names =['get']
@@ -75,14 +77,14 @@ class ShopListAPIView(APIView):
         return Response({'error': 'Shops not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
-class ShopDetailWithSlugAPIView(APIView):
-    """Retrieve details of a specific shop by slug."""
-    http_method_names =['get']
+# class ShopDetailWithSlugAPIView(APIView):
+#     """Retrieve details of a specific shop by slug."""
+#     http_method_names =['get']
 
-    def get(self, request, shop_slug):
-        shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
-        serializer = ShopDetailSerializer(shop)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+#     def get(self, request, shop_slug):
+#         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
+#         serializer = ShopDetailSerializer(shop)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ShopDetailWithUuidAPIView(APIView):
@@ -138,14 +140,16 @@ class ShopCreateAPIView(APIView):
             return Response({'error': 'You already have Shop'}, status=status.HTTP_400_BAD_REQUEST)
 
         data = querydict_to_dict(request.data)
-        data['user'] = str(user.id)  
+        if not data.get('profile'):
+            data['profile'] = None
+        data['user'] = str(user.id)
         serializer = ShopCreateUpdateSerializer(data=data)
         if serializer.is_valid():
             shop = serializer.save(user=user.id)  
             logger.info(f"POST /create/ - Shop {shop.id} created successfully by user {user.id} with status {shop.status}")
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
         logger.warning(f"POST /create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -642,15 +646,13 @@ class CreateShopSocialMediaAPIView(APIView):
     def post(self, request, shop_slug):
         user = request.user
         logger.info(f"POST /social-media/{shop_slug}/create/ - Social media creation request from user {user.id}")
-        data = querydict_to_dict(request.data)
-        data['user'] = str(user.id)
         shop = get_object_or_404(Shop, slug=shop_slug, is_active=True, status=Shop.APPROVED)
         if str(shop.user) != str(user.id):
             logger.warning(f"POST /social-media/{shop_slug}/create/ - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
-        
+
         serializer = ShopSocialMediaSerializer(
-            data=data, context={
+            data=request.data, context={
                 'request': request,
                 'shop': shop
         })
@@ -658,7 +660,7 @@ class CreateShopSocialMediaAPIView(APIView):
             social_media = serializer.save()
             logger.info(f"POST /social-media/{shop_slug}/create/ - Social media {social_media.id} created successfully for shop {shop.id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        
+
         logger.warning(f"POST /social-media/{shop_slug}/create/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -788,11 +790,28 @@ class ShopOrderItemStatusUpdateAPIView(APIView):
         if str(order_item.shop.user) != str(request.user.id):
             logger.warning(f"PATCH /order-item/{order_item.shop.id} - Permission denied for user {user.id}")
             return Response({'error': 'You do not have permission'}, status=status.HTTP_403_FORBIDDEN)
+
+        if order_item.status == ShopOrderItem.Status.DELIVERED:
+            logger.warning(f"PATCH /order-items/{order_item_id}/status/ - Attempt to update delivered order item")
+            return Response(
+                {'error': 'Cannot update order item status. Order item is already delivered and cannot be modified.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        allowed_fields = {'status'}
+        provided_fields = set(request.data.keys())
+        extra_fields = provided_fields - allowed_fields
+        if extra_fields:
+            logger.warning(f"PATCH /order-items/{order_item_id}/status/ - Invalid fields provided: {extra_fields}")
+            return Response(
+                {'error': f'Only status field can be updated. Invalid fields: {", ".join(extra_fields)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         serializer = ShopOrderItemStatusUpdateSerializer(order_item, data=request.data, partial=True)
         if serializer.is_valid():
             new_status = serializer.validated_data.get('status')
-            
+
             # Update status in order-service (source of truth)
             # Shop-service will receive status update via RabbitMQ event
             order_service_response = order_client.update_order_item_status(
@@ -800,23 +819,23 @@ class ShopOrderItemStatusUpdateAPIView(APIView):
                 status=new_status,
                 shop_owner_user_id=str(user.id)  
             )
-            
+
             if order_service_response is None:
                 logger.error(f"Failed to update order item {order_item_id} status in order service")
                 return Response(
                     {'error': 'Failed to update order item status in order service'}, 
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-            
+
             # Update local status from order-service response (source of truth)
             updated_status = order_service_response.get('status')
             if updated_status is not None:
                 order_item.status = updated_status
                 order_item.save(update_fields=['status'])
-            
+
             full_serializer = ShopOrderItemSerializer(order_item)
             return Response(full_serializer.data, status=status.HTTP_200_OK)
-        
+
         logger.warning(f"PATCH /order-items/{order_item_id}/status/ - Validation failed: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         

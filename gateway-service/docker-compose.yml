@@ -16,7 +16,8 @@ services:
       - ./gateway:/app/gateway:rw
       - ./uv.lock:/app/uv.lock:rw
       - ./pyproject.toml:/app/pyproject.toml:rw
-      - ./.cache/uv:/home/appuser/.cache/uv  
+      - ./.cache/uv:/home/appuser/.cache/uv
+      - ./logs:/app/logs:rw  
     restart: unless-stopped
     networks:
       - shared_network
