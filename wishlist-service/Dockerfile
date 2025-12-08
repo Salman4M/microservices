@@ -1,25 +1,31 @@
 # Use Python slim image
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for Postgres client
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     postgresql-client \
     gcc \
     python3-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Install UV - the fast Python package installer
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy ONLY dependency files first (better layer caching)
+COPY pyproject.toml ./
+
+# Install dependencies using UV from pyproject.toml
+RUN uv pip install --system --no-cache .
 
 # Copy entire project
 COPY . .

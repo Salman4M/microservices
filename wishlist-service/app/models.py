@@ -1,6 +1,8 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
+from sqlalchemy import UniqueConstraint
+
 
 
 class Wishlist(SQLModel, table=True):
@@ -10,8 +12,10 @@ class Wishlist(SQLModel, table=True):
     shop_id: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    class Config:
-        unique_together = [('user_id', 'product_variation_id', 'shop_id')]
+    __table_args__ = (
+        UniqueConstraint('user_id', 'product_variation_id', 'shop_id', 
+                        name='uq_user_product_shop'),
+    )
 
 
 class WishlistCreate(SQLModel):
