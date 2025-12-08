@@ -31,10 +31,14 @@ sleep 3
 cd product-service 2>/dev/null && docker-compose up -d && cd .. || echo "Product not found"
 sleep 5
 
-cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
-sleep 3
+# cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
+# sleep 3
 
-cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
+# cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
+# sleep 3
+
+
+cd wishlist-service 2>/dev/null && docker-compose up -d && cd .. || echo "Wishlist not found"
 sleep 3
 
 cd gateway-service 2>/dev/null && docker-compose up -d && cd .. || echo "Gateway not found"

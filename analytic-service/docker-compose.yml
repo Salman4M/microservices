@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:17
@@ -12,6 +10,14 @@ services:
     #   - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecommerce_user -d ecommerce_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 
   web:
     build: .
@@ -22,19 +28,27 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - internal_net
+      - shared_network
     labels:
-      # 🔒 Enable Traefik routing only for admin panel
       - "traefik.enable=true"
-      
-      # Route only /admin/* to this service
-      - "traefik.http.routers.analytic-admin.rule=Host(`analytic.localhost`) && PathPrefix(`/admin`)"
-      
-      # Use same web entrypoint (port 80)
+      - "traefik.http.routers.analytic-admin.rule=Host(`analytic-admin.localhost`)"
       - "traefik.http.routers.analytic-admin.entrypoints=web"
-      
-      # Define the internal service port Django runs on
-      - "traefik.http.services.analytic-admin.loadbalancer.server.port=8000"
+      - "traefik.http.routers.analytic-admin.service=analytic-web-service"
+      - "traefik.http.services.analytic-web-service.loadbalancer.server.port=8000"
+
+networks:
+  internal_net:
+    driver: bridge
+  shared_network:
+    external: true
+    name: shared_network
+
 
 volumes:
   postgres_data:

@@ -18,7 +18,26 @@ echo "  User: $DB_USER"
 
 # --- Wait for Postgres ---
 echo "Waiting for Postgres to be ready..."
-until nc -z $DB_HOST $DB_PORT; do
+until python -c "
+import sys
+import psycopg2
+import os
+try:
+    conn = psycopg2.connect(
+        host='$DB_HOST',
+        port='$DB_PORT',
+        user='$DB_USER',
+        password='$DB_PASSWORD',
+        database='$DB_NAME',
+        connect_timeout=5
+    )
+    conn.close()
+    sys.exit(0)
+except psycopg2.OperationalError as e:
+    sys.exit(1)
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null; do
   echo "Postgres is unavailable - sleeping"
   sleep 2
 done

@@ -1,4 +1,4 @@
-# Python
+# Python cache and compiled files
 __pycache__/
 *.py[cod]
 *.pyo
@@ -6,21 +6,46 @@ __pycache__/
 
 # Virtual environment
 .venv/
-uv/
+env/
+venv/
 
-# IDE
+# IDE and editor files
 .idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
 
-
+# Python dependency files
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
 
 # Lock files
 uv.lock
+poetry.lock
+Pipfile.lock
 
 # Environment variables
 .env
+.env.*
 
 # Static files
 static/
 staticfiles/
 
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Logs
+*.log

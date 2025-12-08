@@ -1,107 +1,110 @@
+﻿# serializers.py - TAM VERSİYA
+import uuid
 from rest_framework import serializers
-from .models import ShopView, ProductView, AnalyticsProduct, Shop, Product
+from .models import ShopView, ProductView, Order, OrderItem, Shop, Product
 
-
-# --- Shop Serializer ---
-class ShopSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    external_id = serializers.UUIDField()
-    name = serializers.CharField()
-
-    class Meta:
-        model = Shop
-        fields = ['id', 'external_id', 'name', 'created_at']
-        read_only_fields = ['id', 'created_at']
-        extra_kwargs = {
-            'external_id': {'validators': []},  # unique yoxlamanı serializer səviyyəsində söndürür
-        }
-
-
-# --- Product Serializer ---
-class ProductSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    external_id = serializers.UUIDField()
-    name = serializers.CharField()
-
-    class Meta:
-        model = Product
-        fields = ['id', 'external_id', 'name', 'created_at']
-        read_only_fields = ['id', 'created_at']
-        extra_kwargs = {
-            'external_id': {'validators': []},
-        }
-
-
-# --- ShopView Serializer ---
-class ShopViewSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    shop = ShopSerializer()
-    viewed_at = serializers.DateTimeField(read_only=True)
-
-    class Meta:
-        model = ShopView
-        fields = ['id', 'shop', 'viewed_at']
+# -----------------------------
+# SHOP VIEW SERIALIZER
+# -----------------------------
+class ShopViewInputSerializer(serializers.Serializer):
+    shop_uuid = serializers.UUIDField()
+    shop_name = serializers.CharField(max_length=100)
 
     def create(self, validated_data):
-        shop_data = validated_data.pop('shop')
+        shop_uuid = validated_data.get("shop_uuid")
+        shop_name = validated_data.get("shop_name")
 
-        # Mövcud Shop-u tap və ya yarat
-        shop, _ = Shop.objects.get_or_create(
-            external_id=shop_data['external_id'],
-            defaults={'name': shop_data['name']}
+        # Shop-u tap və ya yarat
+        shop, created = Shop.objects.get_or_create(
+            external_id=shop_uuid,
+            defaults={"name": shop_name}
         )
 
-        # Hər baxış üçün yeni ShopView əlavə olunur
+        # Əgər mövcud shop-un adı fərqlidirsə, yenilə
+        if not created and shop.name != shop_name:
+            shop.name = shop_name
+            shop.save()
+
+        # ShopView yarat
         shop_view = ShopView.objects.create(shop=shop)
         return shop_view
 
-
-# --- ProductView Serializer ---
-class ProductViewSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    product = ProductSerializer()
-    viewed_at = serializers.DateTimeField(read_only=True)
-
-    class Meta:
-        model = ProductView
-        fields = ['id', 'product', 'viewed_at']
+# -----------------------------
+# PRODUCT VIEW SERIALIZER
+# -----------------------------
+class ProductViewInputSerializer(serializers.Serializer):
+    product_uuid = serializers.UUIDField()
+    product_name = serializers.CharField(max_length=100)
 
     def create(self, validated_data):
-        product_data = validated_data.pop('product')
+        product_uuid = validated_data.get("product_uuid")
+        product_name = validated_data.get("product_name")
 
-        # Mövcud Product-u tap və ya yarat
-        product, _ = Product.objects.get_or_create(
-            external_id=product_data['external_id'],
-            defaults={'name': product_data['name']}
+        # Product-u tap və ya yarat
+        product, created = Product.objects.get_or_create(
+            external_id=product_uuid,
+            defaults={"name": product_name}
         )
 
-        # Hər baxış üçün yeni ProductView əlavə olunur
+        # Əgər mövcud product-un adı fərqlidirsə, yenilə
+        if not created and product.name != product_name:
+            product.name = product_name
+            product.save()
+
+        # ProductView yarat
         product_view = ProductView.objects.create(product=product)
         return product_view
 
-
-# --- AnalyticsProduct Serializer ---
-class AnalyticsProductSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    shop = serializers.UUIDField()
-    product_variation = serializers.UUIDField()
-    created_at = serializers.DateTimeField(read_only=True)
-
+# -----------------------------
+# PRODUCT VIEW SERIALIZER (READ)
+# -----------------------------
+class ProductViewSerializer(serializers.ModelSerializer):
     class Meta:
-        model = AnalyticsProduct
-        fields = ['id', 'shop', 'product_variation', 'count', 'original_price', 'sale_price', 'created_at']
+        model = ProductView
+        fields = '__all__'
 
-    def create(self, validated_data):
-        shop_uuid = validated_data.pop('shop')
-        product_uuid = validated_data.pop('product_variation')
+# -----------------------------
+# SHOP VIEW SERIALIZER (READ)
+# -----------------------------
+class ShopViewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopView
+        fields = '__all__'
 
-        # UUID yoxdursa avtomatik yaradılır
-        shop, _ = Shop.objects.get_or_create(external_id=shop_uuid, defaults={'name': f"Shop {shop_uuid}"})
-        product, _ = Product.objects.get_or_create(external_id=product_uuid, defaults={'name': f"Product {product_uuid}"})
+# -----------------------------
+# ORDER SERIALIZER
+# -----------------------------
+class OrderItemReceiveSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    order = serializers.UUIDField()
+    quantity = serializers.IntegerField()
+    product_variation = serializers.UUIDField()
+    price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    base_price = serializers.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        required=False,
+        default=1.00
+    )
 
-        analytics = AnalyticsProduct.objects.create(
-            shop=shop,
-            product_variation=product,
-            **validated_data
-        )
-        return analytics
+class OrderReceiveSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    user_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    items = OrderItemReceiveSerializer(many=True)
+
+# -----------------------------
+# STATISTICS SERIALIZERS
+# -----------------------------
+class ProductViewStatsSerializer(serializers.Serializer):
+    total_views = serializers.IntegerField()
+    popular_products = serializers.ListField()
+
+class ShopViewStatsSerializer(serializers.Serializer):
+    total_views = serializers.IntegerField()
+    popular_shops = serializers.ListField()
+
+class OrderStatsSerializer(serializers.Serializer):
+    total_orders = serializers.IntegerField()
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    average_order_value = serializers.DecimalField(max_digits=10, decimal_places=2)

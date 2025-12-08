@@ -5,15 +5,18 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load env
-load_dotenv(dotenv_path=BASE_DIR / '.env.docker')
+load_dotenv('')
 
 # Security
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-this')
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-change-this')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = ['*']
 
 # CSRF
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:8000', 'http://localhost:8004' ]
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8001', 'http://localhost:8001']
+
+# config/settings.py - ƏLAVƏ EDİN
+PRODUCT_SERVICE_URL = os.getenv('PRODUCT_SERVICE_URL', 'http://product-service:8000')
 
 # Installed apps
 INSTALLED_APPS = [
@@ -25,8 +28,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'analitic',
+    'drf_yasg',
     'drf_spectacular',
 ]
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -40,6 +46,28 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
+
+REST_FRAMEWORK = {
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ('v1', 'v2'),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Analitic API',
+    'DESCRIPTION': 'Analitic servisin API endpoint-ləri',
+    'VERSION': 'v1',
+    'CONTACT': {'email': 'ilham@example.com'},
+    'LICENSE': {'name': 'BSD License'},
+}
+
+
+
+
+
 
 TEMPLATES = [
     {
@@ -60,19 +88,21 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # Local Windows üçün:
-if os.environ.get("DOCKER", None) == "1":
-    DB_HOST = os.environ.get("DB_HOST", "db")  # Docker Compose konteyner adı
-else:
-    DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")  # Lokal host
+if os.getenv("DOCKER", None) == "1":
+    DB_HOST = os.getenv("POSTGRES_HOST", "db")  # Docker Compose konteyner adı (docker-compose.yml-də "db")
 
+else:
+    DB_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")  # Lokal host
+
+# config/settings.py - DÜZƏLDİN
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'ecommerce_db'),
-        'USER': os.environ.get('DB_USER', 'ecommerce_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', '12345'),
+        'NAME': os.getenv('DB_NAME', 'ecommerce_db'),         # ✅ docker-compose.yml ilə uyğun
+        'USER': os.getenv('DB_USER', 'ecommerce_user'),       # ✅ docker-compose.yml ilə uyğun
+        'PASSWORD': os.getenv('DB_PASSWORD', '12345'),       # ✅ docker-compose.yml ilə uyğun
         'HOST': DB_HOST,
-        'PORT': os.environ.get('DB_PORT', '5432'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
 
@@ -95,15 +125,90 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Logging settings
+LOGGING_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGGING_DIR, exist_ok=True)
 
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'Analitic API',
-    'DESCRIPTION': 'Analitic servisin API endpoint-ləri',
-    'VERSION': 'v1',
-    'CONTACT': {'email': 'ilham@example.com'},
-    'LICENSE': {'name': 'BSD License'},
-}
-
-REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '{levelname} {asctime} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'django_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'django.log'),
+            'formatter': 'default',
+        },
+        'analitic_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'analitic.log'),
+            'formatter': 'default',
+        },
+        'analitic_service_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'analitic_service.log'),
+            'formatter': 'default',
+        },
+        'analitic_views_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'analitic_views.log'),
+            'formatter': 'default',
+        },
+        'product_client_file': {
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'product_client.log'),
+            'formatter': 'default',
+        },
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['django_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic': {
+            'handlers': ['analitic_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic.services': {
+            'handlers': ['analitic_service_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic.services.analitic_service': {
+            'handlers': ['analitic_service_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic.views': {
+            'handlers': ['analitic_views_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic.views.order_views': {
+            'handlers': ['analitic_views_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'analitic.product_client': {
+            'handlers': ['product_client_file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
 }

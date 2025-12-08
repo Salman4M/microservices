@@ -14,13 +14,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # pip güncəllə
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip --default-timeout=100
 
 # Layihə fayllarını kopyala
 COPY . .
 
 # Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --default-timeout=100 --retries=5 -r requirements.txt
 
 # Ətraf mühit dəyişənləri
 ENV DJANGO_SETTINGS_MODULE=config.settings
