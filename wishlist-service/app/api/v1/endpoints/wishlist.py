@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from typing import Annotated
 from sqlmodel import Session, select
 from app.database import get_session
-from app.models import Wishlist, WishlistCreate, WishlistResponse, WishlistListResponse
+from app.models import Wishlist, WishlistRead, WishlistItemCreate, WishlistItemRead
 from app.product_client import product_client
 from app.shop_client import shop_client
 
@@ -20,9 +20,9 @@ def get_user_id(user_id: str = Header(None, alias="X-User-Id", include_in_schema
     return user_id
 
 
-@router.post("/wishlist", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/wishlist", response_model=WishlistItemRead, status_code=status.HTTP_201_CREATED)
 async def add_to_wishlist(
-    wishlist: WishlistCreate, 
+    wishlist: WishlistItemCreate, 
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
 ):
@@ -125,17 +125,24 @@ async def remove_from_wishlist(
     return {"message": "Item removed from wishlist successfully"}
 
 
-@router.get("/wishlist", response_model=list[WishlistResponse])
-async def get_wishlist_items(
+@router.get("/wishlist", response_model=WishlistRead)
+async def get_wishlist(
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
 ):
-    
-    wishlist_items = session.exec(
+    """Works exactly like your get_cart!"""
+    wishlist = session.exec(
         select(Wishlist).where(Wishlist.user_id == user_id)
-    ).all()
+    ).first()
     
-    return wishlist_items
+    if not wishlist:
+        # Create empty wishlist if doesn't exist
+        wishlist = Wishlist(user_id=user_id)
+        session.add(wishlist)
+        session.commit()
+        session.refresh(wishlist)
+    
+    return wishlist
 
 
 @router.get("/wishlist/count")

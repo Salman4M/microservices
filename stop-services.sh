@@ -14,6 +14,7 @@ cd shop-service 2>/dev/null && docker-compose down && cd .. || echo "Shop not fo
 cd user-service 2>/dev/null && docker-compose down && cd .. || echo "User not found"
 cd order-service 2>/dev/null && docker-compose down && cd .. || echo "Order not found"
 cd shopcart-service 2>/dev/null && docker-compose down && cd .. || echo "ShopCart not found"
+cd wishlist-service 2>/dev/null && docker-compose down && cd .. || echo "Wishlist not found"
 cd rabbitmq-service 2>/dev/null && docker-compose down && cd .. || echo "RabbitMQ not found"
 cd redis-service 2>/dev/null && docker-compose down && cd .. || echo "Redis not found"
 
