@@ -29,7 +29,7 @@ async def startup_event():
  
     logger.info("Starting Wishlist Service...")
 
-    create_db_and_tables()
+    # create_db_and_tables()
     logger.info("Database tables created")
 
     # Note: Consumer runs as a separate service, no need to start it here
