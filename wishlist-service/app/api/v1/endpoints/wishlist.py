@@ -5,8 +5,15 @@ from app.database import get_session
 from app.models import Wishlist, WishlistItem, WishlistRead, WishlistItemCreate, WishlistItemRead
 from app.product_client import product_client
 from app.shop_client import shop_client
-
+import httpx
 from app.rabbitmq.publisher import event_publisher
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+
+SHOPCART_SERVICE_URL = os.getenv('SHOPCART_SERVICE_URL')
 
 router = APIRouter()
 
@@ -110,6 +117,98 @@ async def add_to_wishlist(
     
     return db_item
 
+@router.post("/wishlist/{item_id}/move-to-cart")
+async def move_to_cart(
+    item_id: int,
+    session: Session = Depends(get_session),
+    user_id: str = Depends(get_user_id)
+):
+    """Move a product from wishlist to shopping cart"""
+    
+    # Get the wishlist item
+    wishlist_item = session.get(WishlistItem, item_id)
+    
+    if not wishlist_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wishlist item not found"
+        )
+    
+    # Verify ownership
+    wishlist = session.get(Wishlist, wishlist_item.wishlist_id)
+    if not wishlist or wishlist.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only move your own wishlist items"
+        )
+    
+    # Only products can be moved to cart (not shops)
+    if not wishlist_item.product_variation_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only products can be moved to cart. Shops cannot be added to cart."
+        )
+    
+    # Verify product is still active and available
+    product_data = await product_client.get_product_data_by_variation_id(
+        wishlist_item.product_variation_id
+    )
+    if not product_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product no longer available"
+        )
+    
+    # Call ShopCart service to add item
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{SHOPCART_SERVICE_URL}/api/items/{wishlist_item.product_variation_id}",
+                json={},
+                headers={"X-User-Id": user_id}
+            )
+            
+            if response.status_code == 404:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Shopping cart not found. Please create a cart first."
+                )
+            elif response.status_code == 400:
+                error_detail = response.json().get('detail', 'Bad request')
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to add to cart: {error_detail}"
+                )
+            elif response.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="ShopCart service unavailable"
+                )
+            
+            cart_item_data = response.json()
+            
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to connect to ShopCart service: {str(e)}"
+        )
+    
+    # Remove from wishlist after successfully adding to cart
+    session.delete(wishlist_item)
+    session.commit()
+    
+    # Publish event
+    await event_publisher.publish_wishlist_deleted(
+        wishlist_id=item_id,
+        user_id=user_id
+    )
+    
+    return {
+        "message": "Item successfully moved to cart",
+        "cart_item": cart_item_data,
+        "removed_from_wishlist": item_id
+    }
+
 
 @router.delete("/wishlist/{item_id}")
 async def remove_from_wishlist(
@@ -157,11 +256,10 @@ async def get_wishlist(
     ).first()
     
     if not wishlist:
-        # Create empty wishlist if doesn't exist
-        wishlist = Wishlist(user_id=user_id)
-        session.add(wishlist)
-        session.commit()
-        session.refresh(wishlist)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wishlist not found. Please contact support."
+        )
     
     return wishlist
 
