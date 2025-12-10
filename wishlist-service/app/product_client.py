@@ -37,7 +37,7 @@ class ProductServiceDataCheck:
                     product_data = response.json()
                     
                     # Check if product is active
-                    product = product_data.get('product', {})
+                    product = product_data.get('product') or {}
                     is_active = product.get('is_active', True)
                     
                     if not is_active:
