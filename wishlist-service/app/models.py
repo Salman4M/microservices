@@ -36,14 +36,14 @@ class WishlistItem(SQLModel, table=True):
 
 class WishlistItemCreate(SQLModel):
     product_variation_id: Optional[str] = None
-    shop_id: Optional[str] = None
+    # shop_id: Optional[str] = None
 
 
 
 class WishlistItemRead(SQLModel):
     id: int
     product_variation_id: Optional[str] = None
-    shop_id: Optional[str] = None
+    # shop_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     

@@ -30,9 +30,9 @@ celery.conf.update(
 
 # Configure periodic tasks
 celery.conf.beat_schedule = {
-    'remove-inactive-products-every-30-minutes': {
+    'remove-inactive-products-every-3-minutes': {
         'task': 'app.tasks.remove_inactive_products_from_wishlists',
-        'schedule': 1800.0,  # Every 30 minutes
+        'schedule': 180.0,  # Every 3 minutes
     },
 }
 
