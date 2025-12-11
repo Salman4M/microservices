@@ -13,12 +13,15 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+
 # Initialize Celery
 celery = Celery(
     "wishlist_worker",
     broker=os.getenv("CELERY_BROKER_URL", "amqp://admin:admin12345@rabbitmq:5672//"),
     backend=os.getenv("CELERY_RESULT_BACKEND", "redis://redis_service:6379/0")
 )
+
+celery.autodiscover_tasks(['app'])
 
 celery.conf.update(
     task_serializer='json',

@@ -105,6 +105,7 @@ services:
       PYTHONUNBUFFERED: 1
     volumes:
       - ./:/app:rw
+    entrypoint: []
     command: celery -A app.tasks worker --loglevel=info
     restart: unless-stopped
     networks:
@@ -137,6 +138,7 @@ services:
       PYTHONUNBUFFERED: 1
     volumes:
       - ./:/app:rw
+    entrypoint: [] 
     command: celery -A app.tasks beat --loglevel=info
     restart: unless-stopped
     networks:
