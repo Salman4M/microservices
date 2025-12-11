@@ -74,6 +74,7 @@ services:
       PYTHONUNBUFFERED: 1
     volumes:
       - ./:/app:rw
+    entrypoint: []
     command: python -u consumer.py
     restart: unless-stopped
     networks:

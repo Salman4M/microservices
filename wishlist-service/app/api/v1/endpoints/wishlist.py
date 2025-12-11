@@ -32,16 +32,16 @@ async def add_to_wishlist(
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
 ):
-    # Get or create the user's wishlist container
+    # Get the user's wishlist
     wishlist = session.exec(
         select(Wishlist).where(Wishlist.user_id == user_id)
     ).first()
     
     if not wishlist:
-        wishlist = Wishlist(user_id=user_id)
-        session.add(wishlist)
-        session.commit()
-        session.refresh(wishlist)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wishlist not found. Please contact support."
+        )
 
     # Validate and create the wishlist item
     if item_data.product_variation_id:
@@ -107,13 +107,6 @@ async def add_to_wishlist(
     session.add(db_item)
     session.commit()
     session.refresh(db_item)
-
-    await event_publisher.publish_wishlist_created(
-        wishlist_id=db_item.id,
-        user_id=user_id,
-        product_variation_id=item_data.product_variation_id,
-        shop_id=item_data.shop_id
-    )
     
     return db_item
 
@@ -122,9 +115,7 @@ async def move_to_cart(
     item_id: int,
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
-):
-    """Move a product from wishlist to shopping cart"""
-    
+):    
     # Get the wishlist item
     wishlist_item = session.get(WishlistItem, item_id)
     
@@ -250,7 +241,6 @@ async def get_wishlist(
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
 ):
-    """Get user's complete wishlist with all items"""
     wishlist = session.exec(
         select(Wishlist).where(Wishlist.user_id == user_id)
     ).first()
@@ -269,7 +259,6 @@ async def get_wishlist_count(
     session: Session = Depends(get_session),
     user_id: str = Depends(get_user_id)
 ):
-    """Get count of items in user's wishlist"""
     wishlist = session.exec(
         select(Wishlist).where(Wishlist.user_id == user_id)
     ).first()
