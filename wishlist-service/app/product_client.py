@@ -19,10 +19,7 @@ class ProductServiceDataCheck:
         product_var_id: str, 
         user_id: Optional[str] = None
     ) -> Optional[dict]:
-        """
-        Get product data by variation ID
-        Returns product data if active and exists, None otherwise
-        """
+
         try:
             url = f'{self.base_url}/api/products/variations/{product_var_id}'
             
@@ -75,11 +72,7 @@ class ProductServiceDataCheck:
             )
     
     async def check_product_is_active(self, product_var_id: str) -> bool:
-        """
-        Check if a product variation is active
-        Returns True if active, False if inactive or not found
-        Does not raise exceptions - safe for batch operations
-        """
+
         try:
             url = f'{self.base_url}/api/products/variations/{product_var_id}'
             

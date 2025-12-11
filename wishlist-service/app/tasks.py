@@ -21,7 +21,7 @@ celery = Celery(
     backend=os.getenv("CELERY_RESULT_BACKEND", "redis://redis_service:6379/0")
 )
 
-celery.autodiscover_tasks(['app'])
+celery.autodiscover_tasks(['app'], force = True)
 
 celery.conf.update(
     task_serializer='json',
@@ -29,6 +29,10 @@ celery.conf.update(
     result_serializer='json',
     timezone='UTC',
     enable_utc=True,
+    task_default_queue='wishlist_queue',
+    task_routes={
+        'app.tasks.*': {'queue': 'wishlist_queue'}
+    }
 )
 
 # Configure periodic tasks
@@ -41,32 +45,28 @@ celery.conf.beat_schedule = {
 
 
 async def check_product_is_active(product_variation_id: str) -> bool:
-    """
-    Check if a product is still active via Product Service
-    Returns True if active, False if inactive or not found
-    """
+
     try:
         product_data = await product_client.get_product_data_by_variation_id(product_variation_id)
         
-        if not product_data:
+        if not product_data or product_data is None:
             logger.warning(f"Product variation {product_variation_id} not found")
             return False
         
         # If product_data is returned, check for is_active status
         # This assumes the product service returns product details
+        logger.debug(f"Product variation {product_variation_id} is active")
+
         return True
         
     except Exception as e:
         logger.error(f"Error checking product {product_variation_id}: {str(e)}")
-        return False
+        return True
 
 
 @celery.task(name='app.tasks.remove_inactive_products_from_wishlists')
 def remove_inactive_products_from_wishlists():
-    """
-    Periodic task to remove inactive products from all wishlists
-    Runs every 30 minutes
-    """
+
     logger.info("🔍 Starting inactive products cleanup task...")
     
     removed_count = 0
@@ -102,7 +102,7 @@ def remove_inactive_products_from_wishlists():
                         check_product_is_active(item.product_variation_id)
                     )
                     
-                    if not is_active:
+                    if is_active == False:
                         # Product is inactive or not found - remove from wishlist
                         logger.info(
                             f"🗑️ Removing inactive product {item.product_variation_id} "
@@ -157,10 +157,7 @@ def remove_inactive_products_from_wishlists():
 
 @celery.task(name='app.tasks.remove_specific_product_from_wishlists')
 def remove_specific_product_from_wishlists(product_variation_id: str):
-    """
-    Remove a specific product from all wishlists
-    This can be triggered when a product becomes inactive
-    """
+
     logger.info(f"🗑️ Removing product {product_variation_id} from all wishlists...")
     
     try:
@@ -212,7 +209,6 @@ def remove_specific_product_from_wishlists(product_variation_id: str):
 
 @celery.task(name='app.tasks.test_wishlist_cleanup')
 def test_wishlist_cleanup():
-    """Test task to verify Celery is working"""
     logger.info("🧪 Test task executed successfully")
     
     try:

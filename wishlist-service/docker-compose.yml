@@ -106,7 +106,7 @@ services:
     volumes:
       - ./:/app:rw
     entrypoint: []
-    command: celery -A app.tasks worker --loglevel=info
+    command: celery -A app.tasks worker --loglevel=info --queues=wishlist_queue
     restart: unless-stopped
     networks:
       - internal_net

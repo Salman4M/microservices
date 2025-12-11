@@ -149,3 +149,9 @@ celerybeat-schedule
 
 
 node_modules/
+
+#Celery
+celerybeat-schedule
+celerybeat-schedule-shm 
+celerybeat-schedule-wal
+
