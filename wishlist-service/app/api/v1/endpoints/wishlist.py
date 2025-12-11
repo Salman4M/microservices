@@ -4,7 +4,6 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Wishlist, WishlistItem, WishlistRead, WishlistItemCreate, WishlistItemRead
 from app.product_client import product_client
-from app.shop_client import shop_client
 import httpx
 from app.rabbitmq.publisher import event_publisher
 from dotenv import load_dotenv
@@ -71,37 +70,10 @@ async def add_to_wishlist(
             product_variation_id=item_data.product_variation_id
         )
     
-    elif item_data.shop_id:
-        shop_data = await shop_client.get_shop_data(item_data.shop_id)
-        if not shop_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Shop not found in Shop Service"
-            )
-        
-        # Check if shop already in wishlist
-        existing = session.exec(
-            select(WishlistItem).where(
-                WishlistItem.wishlist_id == wishlist.id,
-                WishlistItem.shop_id == item_data.shop_id
-            )
-        ).first()
-        
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Shop already in wishlist"
-            )
-        
-        db_item = WishlistItem(
-            wishlist_id=wishlist.id,
-            shop_id=item_data.shop_id
-        )
-    
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either product_variation_id or shop_id must be provided"
+            detail="product_variation_id  must be provided"
         )
 
     session.add(db_item)
@@ -133,12 +105,6 @@ async def move_to_cart(
             detail="You can only move your own wishlist items"
         )
     
-    # Only products can be moved to cart (not shops)
-    if not wishlist_item.product_variation_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only products can be moved to cart. Shops cannot be added to cart."
-        )
     
     # Verify product is still active and available
     product_data = await product_client.get_product_data_by_variation_id(

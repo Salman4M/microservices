@@ -1,7 +1,3 @@
-"""
-Celery tasks for Wishlist Service
-Periodic tasks to clean up inactive products
-"""
 from celery import Celery
 import os
 import logging
