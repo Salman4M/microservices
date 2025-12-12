@@ -13,8 +13,15 @@ class ProductVariationBase(BaseModel):
     original_price: Optional[float] = Field(None, gt=0)
     discount: Optional[float] = Field(None, ge=0, le=100)
 
-class ProductVariationCreate(ProductVariationBase):
-    pass
+class ProductVariationCreate(BaseModel):
+    size: Optional[str] = Field(None, max_length=10)
+    color: Optional[str] = Field(None, max_length=30)
+    count: int = 0
+    amount: int = 0
+    amount_limit: int = 0
+    price: Optional[float] = Field(None, gt=0)
+    original_price: Optional[float] = Field(None, gt=0)
+    discount: Optional[float] = Field(None, ge=0, le=100)
 
 class ProductVariation(ProductVariationBase):
     id: UUID

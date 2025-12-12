@@ -1,3 +1,4 @@
+from typing import Optional
 from .base import BaseRepository
 from src.app.models.v1 import Comment, ProductVariation
 from fastapi import HTTPException
@@ -25,6 +26,9 @@ class CommentRepository(BaseRepository[Comment]):
 
     def get_by_variation(self, variation_id: UUID, skip: int = 0, limit: int = 100) -> list[Comment]:
         return self.db_session.query(Comment).filter(Comment.product_variation_id == variation_id).offset(skip).limit(limit).all()
+    
+    def get(self, id: UUID) -> Optional[Comment]:
+        return self.db_session.query(self.model).filter(self.model.comment_id == id).first()
 
     def delete(self, id: UUID) -> bool:
         db_obj = self.get(id)

@@ -34,9 +34,8 @@ sleep 5
 # cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
 # sleep 3
 
-# cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
-# sleep 3
-
+cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
+sleep 3
 
 cd wishlist-service 2>/dev/null && docker-compose up -d && cd .. || echo "Wishlist not found"
 sleep 3
