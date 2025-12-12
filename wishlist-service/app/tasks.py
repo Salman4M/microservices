@@ -45,8 +45,10 @@ async def check_product_is_active(product_variation_id: str) -> bool:
     try:
         product_data = await product_client.get_product_data_by_variation_id(product_variation_id)
         
-        if not product_data or product_data is None:
-            logger.warning(f"Product variation {product_variation_id} not found")
+        if not product_data:
+            logger.warning(
+                f"Product variation {product_variation_id} not found or inactive"
+            )
             return False
         
         # If product_data is returned, check for is_active status
@@ -57,6 +59,12 @@ async def check_product_is_active(product_variation_id: str) -> bool:
         
     except Exception as e:
         logger.error(f"Error checking product {product_variation_id}: {str(e)}")
+        # On error, assume product is active to avoid false removals
+        # The periodic task will check again later
+        logger.warning(
+            f"Assuming product {product_variation_id} is active due to error "
+            "(will be rechecked on next run)"
+        )
         return True
 
 

@@ -28,11 +28,20 @@ def verify_product_exists(variation_id: UUID):
             return None
         
         data = response.json()
-        product = data.get('product', {})
+        product = data.get('product')
+        if product is None:
+            logger.warning(f"⚠️ No product field in response for {variation_id}")
+            return None
+
+        is_active = product.get('is_active', True)
+
+        if not is_active:
+            logger.warning(f"⚠️ Product variation {variation_id} is inactive")
+            return None
         
         return {
             "amount": data.get('amount', 0),
-            "is_active": product.get('is_active', True)
+            "is_active": product.get('is_active')
         }
                 
     except requests.exceptions.Timeout:
