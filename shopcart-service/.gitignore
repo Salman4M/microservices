@@ -1,7 +1,6 @@
 # Virtual environments
 .venv/
-shopcart_service.egg-info/
-
+*.egg-info/
 # Env files
 .env
 .env.prod
@@ -10,7 +9,8 @@ shopcart_service.egg-info/
 # Python cache
 __pycache__/
 .*__pycache__/
-
+.pytest_cache/
+.cache/
 
 # Sensitive files
 handlers.py
