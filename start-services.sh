@@ -19,8 +19,9 @@ sleep 5
 cd traefik-service 2>/dev/null && docker-compose up -d && cd .. || echo "Traefik not found"
 sleep 3
 
-# cd elasticsearch-service 2>/dev/null && docker-compose up -d && cd .. || echo "Elasticsearch not found"
-# sleep 10
+cd analytic-service 2>/dev/null && docker-compose up -d && cd .. || echo "Analytic not found"
+sleep 3
+
 
 cd user-service 2>/dev/null && docker-compose up -d && cd .. || echo "User not found"
 sleep 3
@@ -31,8 +32,8 @@ sleep 3
 cd product-service 2>/dev/null && docker-compose up -d && cd .. || echo "Product not found"
 sleep 5
 
-# cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
-# sleep 3
+cd order-service 2>/dev/null && docker-compose up -d && cd .. || echo "Order not found"
+sleep 3
 
 cd shopcart-service 2>/dev/null && docker-compose up -d && cd .. || echo "ShopCart not found"
 sleep 3

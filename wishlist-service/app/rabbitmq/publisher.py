@@ -1,6 +1,5 @@
-import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Optional
 from aio_pika import Message, DeliveryMode
 
 from app.rabbitmq.connection import rabbitmq_connection

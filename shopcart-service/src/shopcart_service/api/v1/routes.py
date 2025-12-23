@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi import Header
 from sqlalchemy.orm import Session
 import logging
 from src.shopcart_service import crud, schemas
 from src.shopcart_service.core import db
 from src.shopcart_service import models
-from pydantic import UUID4
-from src.shopcart_service.core.product_client import product_client
+
 from uuid import UUID
 from ...core.product_client import ProductServiceDataCheck
 product_client = ProductServiceDataCheck()

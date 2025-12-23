@@ -1,7 +1,6 @@
 import httpx
 import os
-from typing import Optional
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from dotenv import load_dotenv
 
 from uuid import UUID

@@ -13,7 +13,6 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # 3. Import your models
-from app.models import Wishlist
 from sqlmodel import SQLModel
 
 # Alembic Config object

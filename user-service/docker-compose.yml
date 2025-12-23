@@ -29,6 +29,18 @@ services:
     restart: on-failure
     env_file:
       - .env
+    # command: >
+    #   gunicorn Core.wsgi:application
+    #   --bind 0.0.0.0:8000
+    #   --workers 8
+    #   --threads 2
+    #   --worker-class sync
+    #   --timeout 120
+    # deploy:
+    #   replicas: 2  # Run 2 instances
+    #   resources:
+    #     limits:
+    #       cpus: '4.0'
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}

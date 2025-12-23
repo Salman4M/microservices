@@ -29,7 +29,7 @@ class RabbitMQConsumer:
         try:
             user_uuid = message.get('user_uuid')
             if not user_uuid:
-                print(f"⚠️ Missing user_uuid in message")
+                print("⚠️ Missing user_uuid in message")
                 return False
             
             cart = crud.create_cart(db, user_uuid)
@@ -48,7 +48,7 @@ class RabbitMQConsumer:
             order_id = data.get('order_id')
             
             if not all([user_uuid, cart_id]):
-                print(f"⚠️ Missing required fields in order.created event")
+                print("⚠️ Missing required fields in order.created event")
                 return False
             
             # Find the cart
@@ -87,7 +87,7 @@ class RabbitMQConsumer:
             shop_id = message.get('shop_id')
             
             if not user_uuid:
-                print(f"⚠️ Missing user_uuid in shop.approved event")
+                print("⚠️ Missing user_uuid in shop.approved event")
                 return False
             
             # Use the dedicated CRUD function to delete cart
@@ -123,7 +123,7 @@ class RabbitMQConsumer:
                 if message.get('is_active', True):  # Only create cart for active users
                     success = self.handle_user_created(db, message)
                 else:
-                    print(f"ℹ️ Skipping inactive user")
+                    print("ℹ️ Skipping inactive user")
                     success = True
                     
             elif event_type == 'order.created':

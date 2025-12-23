@@ -7,6 +7,30 @@ services:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - xpack.security.enabled=true
+      # JVM heap size - set to 50% of container memory limit
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      # Disable bootstrap memory lock to avoid allocation failures
+      - bootstrap.memory_lock=false
+      # Reduce thread pools for lower resource usage
+      - thread_pool.write.queue_size=200
+      - thread_pool.search.queue_size=500
+    # Docker resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 1G  # Total container memory
+          cpus: '1.0'  # CPU cores
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Increase ulimits
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     networks:
       - shared_network
     restart: always
@@ -17,7 +41,13 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-        tag: "elasticsearch" 
+        tag: "elasticsearch"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   setup_kibana_password:
     image: curlimages/curl:latest
@@ -41,7 +71,8 @@ services:
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD:-${ELASTIC_PASSWORD}}
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - shared_network
     restart: "no"
@@ -55,6 +86,17 @@ services:
       - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASSWORD:-${ELASTIC_PASSWORD}}
       - SERVERNAME=kibana
       - SERVER_HOST=0.0.0.0
+      # Kibana memory optimization
+      - NODE_OPTIONS="--max-old-space-size=512"
+    # Docker resource limits for Kibana
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
     depends_on:
       - elasticsearch
       - setup_kibana_password
@@ -72,6 +114,12 @@ services:
         max-size: "10m"
         max-file: "3"
         tag: "kibana"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
   
   consumer:
     build: .
@@ -86,9 +134,18 @@ services:
       - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
       - RABBITMQ_USER=${RABBITMQ_USER:-admin}
       - RABBITMQ_PASS=${RABBITMQ_PASS:-admin12345}
+    # Resource limits for consumer
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
     depends_on:
       elasticsearch:
-        condition: service_started
+        condition: service_healthy
     networks:
       - shared_network
     restart: always
@@ -113,9 +170,18 @@ services:
       - ELASTIC_HOST=${ELASTIC_HOST:-http://elasticsearch:9200}
       - ELASTIC_USERNAME=${ELASTIC_USERNAME:-elastic}
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    # Resource limits for API
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.25'
     depends_on:
       elasticsearch:
-        condition: service_started
+        condition: service_healthy
     networks:
       - shared_network
     restart: always

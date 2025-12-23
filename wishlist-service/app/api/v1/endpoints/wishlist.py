@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
-from typing import Annotated
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Wishlist, WishlistItem, WishlistRead, WishlistItemCreate, WishlistItemRead

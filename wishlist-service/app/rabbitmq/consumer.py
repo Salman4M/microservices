@@ -45,7 +45,7 @@ class EventConsumer:
                 else:
                     logger.warning(f"⚠️ Unknown event type: {event_type}")
                 
-                logger.info(f"✅ Message processed successfully")
+                logger.info("✅ Message processed successfully")
                 
             except json.JSONDecodeError as e:
                 logger.error(f"❌ Failed to decode message: {str(e)}")

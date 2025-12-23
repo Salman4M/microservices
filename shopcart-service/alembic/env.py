@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.shopcart_service.core.db import Base
-from src.shopcart_service.models import ShopCart,CartItem
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 

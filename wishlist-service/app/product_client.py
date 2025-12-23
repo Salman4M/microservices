@@ -59,7 +59,7 @@ class ProductServiceDataCheck:
                     )
                     
         except httpx.TimeoutException:
-            logger.error(f"Timeout connecting to Product Service")
+            logger.error("Timeout connecting to Product Service")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail='Product Service timeout'

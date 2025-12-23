@@ -1,5 +1,4 @@
-import asyncio
-from aio_pika import connect_robust, Channel, Connection, Exchange, Queue
+from aio_pika import connect_robust
 from aio_pika.abc import (
     AbstractRobustConnection,
     AbstractRobustChannel,

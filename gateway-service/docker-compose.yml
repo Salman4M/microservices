@@ -5,8 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: gateway_service
+    # container_name: gateway_service
     command: ["sh", "/app/entrypoint.sh"]
+    deploy:
+      replicas: 2 
     # ports:
     #   - "8002:8080"
     env_file:

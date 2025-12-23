@@ -3,7 +3,7 @@ from uuid import uuid4
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from src.shopcart_service.core.db import Base
-from src.shopcart_service import models, schemas, crud
+from src.shopcart_service import schemas, crud
 
 
 # Test database setup
